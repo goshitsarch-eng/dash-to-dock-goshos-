@@ -95,6 +95,8 @@ const HARD_ITEM_LIMIT = 500;
 const FAN_MAX_ITEMS = 10;
 const GRID_MAX_COLUMNS = 6;
 const LIST_ICON_SIZE = 22;
+// Rough height of one jump list row, used to keep the popup on screen.
+const LIST_ROW_HEIGHT = 34;
 const TILE_ICON_SIZE = 48;
 const FAN_TILE_GAP = 6;
 const GRID_SPACING = 6;
@@ -605,8 +607,22 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         return entries.slice(0, max);
     }
 
+    /**
+     * A popup menu does not scroll, so the jump list can only be as long as
+     * the monitor allows. Anything past that is reported as overflow.
+     *
+     * @returns {number} how many rows fit on screen
+     */
+    _listCapacity() {
+        const monitor = Main.layoutManager.findMonitorForActor(this.sourceActor) ??
+            Main.layoutManager.primaryMonitor;
+        const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
+        const rowHeight = LIST_ROW_HEIGHT * scaleFactor;
+        return Math.max(5, Math.floor((monitor?.height ?? 720) * 0.7 / rowHeight));
+    }
+
     _buildList(entries) {
-        const shown = this._limit(entries);
+        const shown = this._limit(entries).slice(0, this._listCapacity());
 
         shown.forEach(entry => {
             const item = new PopupMenu.PopupBaseMenuItem();
