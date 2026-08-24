@@ -697,30 +697,30 @@
       <summary>Show a Home stack in the dock</summary>
       <description>Add a dock item that pops up the contents of the home folder.</description>
     </key>
-    <key name="show-custom-stack" type="b">
-      <default>false</default>
-      <summary>Show a custom folder stack in the dock</summary>
-      <description>Add a dock item that pops up the contents of a folder of your choice.</description>
-    </key>
-    <key name="custom-stack-path" type="s">
-      <default>''</default>
-      <summary>The folder shown by the custom stack</summary>
-      <description>An absolute path or an URI. A leading tilde is expanded to the home folder.</description>
-    </key>
-    <key name="custom-stack-name" type="s">
-      <default>''</default>
-      <summary>The name of the custom stack</summary>
-      <description>Shown in the dock tooltip. When empty the folder name is used.</description>
+    <key name="custom-stacks" type="as">
+      <default>[]</default>
+      <summary>Folders added to the dock as stacks</summary>
+      <description>Absolute paths or URIs, in dock order. A leading tilde is expanded to the home folder. Each folder gets its own dock item, named after the folder.</description>
     </key>
     <key name="stack-view" enum="org.gnome.shell.extensions.dash-to-dock.stack-view">
       <default>'AUTOMATIC'</default>
-      <summary>How stack contents are displayed</summary>
-      <description>Automatic uses a fan for small folders and a grid otherwise, matching the macOS behaviour.</description>
+      <summary>How stack contents are displayed by default</summary>
+      <description>Automatic uses a fan for small folders and a grid otherwise, matching the macOS behaviour. Used by every stack that has no choice of its own.</description>
     </key>
     <key name="stack-sort" enum="org.gnome.shell.extensions.dash-to-dock.stack-sort">
       <default>'NAME'</default>
-      <summary>How stack contents are sorted</summary>
-      <description>Sort the contents of a stack by name, by modification date or by kind.</description>
+      <summary>How stack contents are sorted by default</summary>
+      <description>Sort the contents of a stack by name, by modification date or by kind. Used by every stack that has no choice of its own.</description>
+    </key>
+    <key name="stack-view-overrides" type="a{ss}">
+      <default>{}</default>
+      <summary>Per stack view, as picked from the right click menu</summary>
+      <description>Maps a stack to one of AUTOMATIC, FAN, GRID or LIST. Stacks that are not listed use the default view.</description>
+    </key>
+    <key name="stack-sort-overrides" type="a{ss}">
+      <default>{}</default>
+      <summary>Per stack sort order, as picked from the right click menu</summary>
+      <description>Maps a stack to one of NAME, DATE_MODIFIED or KIND. Stacks that are not listed use the default sort order.</description>
     </key>
     <key name="stack-max-items" type="i">
       <default>40</default>

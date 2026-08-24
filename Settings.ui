@@ -2751,82 +2751,55 @@
                                 <property name="can_focus">0</property>
                                 <property name="hexpand">1</property>
                                 <property name="halign">start</property>
-                                <property name="label" translatable="yes">Custom folder stack</property>
+                                <property name="label" translatable="yes">Folders in the dock</property>
                                 <layout>
                                   <property name="column">0</property>
                                   <property name="row">0</property>
-                                  <property name="column-span">1</property>
                                 </layout>
                               </object>
                             </child>
                             <child>
-                              <object class="GtkSwitch" id="custom_stack_switch">
-                                <property name="halign">end</property>
+                              <object class="GtkButton" id="custom_stacks_add_button">
                                 <property name="valign">center</property>
+                                <property name="halign">end</property>
+                                <property name="label" translatable="yes">Add Folder…</property>
                                 <layout>
                                   <property name="column">1</property>
                                   <property name="row">0</property>
+                                </layout>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="can_focus">0</property>
+                                <property name="hexpand">1</property>
+                                <property name="halign">start</property>
+                                <property name="label" translatable="yes">Every folder you add gets its own dock item. Right-click it in the dock to pick how its contents are shown.</property>
+                                <property name="wrap">1</property>
+                                <property name="max_width_chars">60</property>
+                                <property name="xalign">0</property>
+                                <style><class name="dim-label"/></style>
+                                <layout>
+                                  <property name="column">0</property>
+                                  <property name="row">1</property>
                                   <property name="column-span">2</property>
                                 </layout>
                               </object>
                             </child>
                             <child>
-                              <object class="GtkLabel">
+                              <object class="GtkFrame" id="custom_stacks_frame">
                                 <property name="can_focus">0</property>
-                                <property name="hexpand">1</property>
-                                <property name="halign">start</property>
-                                <property name="label" translatable="yes">Folder</property>
-                                <layout>
-                                  <property name="column">0</property>
-                                  <property name="row">1</property>
-                                  <property name="column-span">1</property>
-                                </layout>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkEntry" id="custom_stack_path_entry">
-                                <property name="valign">center</property>
-                                <property name="hexpand">1</property>
-                                <property name="width_request">260</property>
-                                <property name="placeholder_text" translatable="yes">~/Pictures</property>
-                                <layout>
-                                  <property name="column">1</property>
-                                  <property name="row">1</property>
-                                </layout>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkButton" id="custom_stack_browse_button">
-                                <property name="valign">center</property>
-                                <property name="label" translatable="yes">Choose…</property>
-                                <layout>
-                                  <property name="column">2</property>
-                                  <property name="row">1</property>
-                                </layout>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkLabel">
-                                <property name="can_focus">0</property>
-                                <property name="hexpand">1</property>
-                                <property name="halign">start</property>
-                                <property name="label" translatable="yes">Name</property>
+                                <property name="margin_top">6</property>
+                                <property name="child">
+                                  <object class="GtkListBox" id="custom_stacks_listbox">
+                                    <property name="can_focus">0</property>
+                                    <property name="selection_mode">none</property>
+                                  </object>
+                                </property>
                                 <layout>
                                   <property name="column">0</property>
                                   <property name="row">2</property>
-                                  <property name="column-span">1</property>
-                                </layout>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkEntry" id="custom_stack_name_entry">
-                                <property name="valign">center</property>
-                                <property name="hexpand">1</property>
-                                <property name="width_request">260</property>
-                                <property name="placeholder_text" translatable="yes">Optional</property>
-                                <layout>
-                                  <property name="column">1</property>
-                                  <property name="row">2</property>
+                                  <property name="column-span">2</property>
                                 </layout>
                               </object>
                             </child>
@@ -2850,7 +2823,7 @@
                                 <property name="can_focus">0</property>
                                 <property name="hexpand">1</property>
                                 <property name="halign">start</property>
-                                <property name="label" translatable="yes">View content as</property>
+                                <property name="label" translatable="yes">Default view</property>
                                 <layout>
                                   <property name="column">0</property>
                                   <property name="row">0</property>
@@ -2895,7 +2868,7 @@
                                 <property name="can_focus">0</property>
                                 <property name="hexpand">1</property>
                                 <property name="halign">start</property>
-                                <property name="label" translatable="yes">Sort by</property>
+                                <property name="label" translatable="yes">Default sort</property>
                                 <layout>
                                   <property name="column">0</property>
                                   <property name="row">0</property>
@@ -2993,6 +2966,61 @@
                                 <layout>
                                   <property name="column">1</property>
                                   <property name="row">0</property>
+                                </layout>
+                              </object>
+                            </child>
+                          </object>
+                        </property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkListBoxRow">
+                        <property name="child">
+                          <object class="GtkGrid">
+                            <property name="can_focus">0</property>
+                            <property name="margin_start">12</property>
+                            <property name="margin_end">12</property>
+                            <property name="margin_top">12</property>
+                            <property name="margin_bottom">12</property>
+                            <property name="column_spacing">32</property>
+                            <property name="row_spacing">6</property>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="can_focus">0</property>
+                                <property name="hexpand">1</property>
+                                <property name="halign">start</property>
+                                <property name="label" translatable="yes">Per-stack view and sort choices</property>
+                                <layout>
+                                  <property name="column">0</property>
+                                  <property name="row">0</property>
+                                </layout>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkButton" id="stack_overrides_reset_button">
+                                <property name="valign">center</property>
+                                <property name="halign">end</property>
+                                <property name="label" translatable="yes">Reset</property>
+                                <layout>
+                                  <property name="column">1</property>
+                                  <property name="row">0</property>
+                                </layout>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="can_focus">0</property>
+                                <property name="hexpand">1</property>
+                                <property name="halign">start</property>
+                                <property name="label" translatable="yes">Forget the Fan, Grid, List and sorting choices made by right-clicking stacks in the dock, so they follow the defaults again.</property>
+                                <property name="wrap">1</property>
+                                <property name="max_width_chars">60</property>
+                                <property name="xalign">0</property>
+                                <style><class name="dim-label"/></style>
+                                <layout>
+                                  <property name="column">0</property>
+                                  <property name="row">1</property>
+                                  <property name="column-span">2</property>
                                 </layout>
                               </object>
                             </child>

@@ -14,8 +14,8 @@ It is a fork of [Dash to Dock](https://github.com/micheleg/dash-to-dock) that ad
 | **Show Applications as a stack** — the Show Applications button pops the installed applications up over the dock instead of opening the activities overview | *Show Applications opens a stack* |
 | **Applications stack** — a dedicated dock item that pops up the installed applications | *Applications stack* |
 | **Documents / Downloads / Home stacks** — dock items that pop up the contents of those folders | *Documents stack*, *Downloads stack*, *Home stack* |
-| **Custom folder stack** — the same, for any folder you pick | *Custom folder stack* |
-| **Fan / Grid / List stack views** — the three macOS stack presentations, plus *Automatic*, and sorting by name, date modified or kind (also reachable by right-clicking a stack) | *View content as*, *Sort by* |
+| **Folder stacks** — add any number of folders to the dock, each with its own dock item named after the folder | *Folders in the dock → Add Folder…* |
+| **Fan / Grid / List / Automatic stack views** — the macOS stack presentations, and sorting by name, date modified or kind. **Every stack keeps its own choice**: right-click Applications, Documents, Downloads, Home or any folder you added and pick *Sort by* and *View content as* for that one stack. The preferences set the default used by stacks you have not chosen for yet | right-click a stack; *Default view*, *Default sort* |
 | **Stacks divider** — the macOS style divider between the applications and the stacks | *Show a divider before the stacks* |
 | **Recent applications** — append the most recently used applications that are neither pinned nor running | *Show recently used applications* |
 | **Launch bounce** — the icon of a starting application hops out of the dock | *Bounce the icon of a starting application* |

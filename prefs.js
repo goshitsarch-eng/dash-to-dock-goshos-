@@ -5,6 +5,7 @@ import GObject from 'gi://GObject';
 import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
+import Pango from 'gi://Pango';
 
 import {
     ExtensionPreferences,
@@ -1213,7 +1214,6 @@ const DockSettings = GObject.registerClass({
             ['documents_stack_switch', 'show-documents-stack'],
             ['downloads_stack_switch', 'show-downloads-stack'],
             ['home_stack_switch', 'show-home-stack'],
-            ['custom_stack_switch', 'show-custom-stack'],
             ['stacks_separator_switch', 'show-stacks-separator'],
             ['recent_applications_switch', 'show-recent-applications'],
             ['launch_bounce_switch', 'launch-bounce-animation'],
@@ -1221,20 +1221,16 @@ const DockSettings = GObject.registerClass({
         ].forEach(([id, key]) =>
             this._settings.bind(key, get(id), 'active', Gio.SettingsBindFlags.DEFAULT));
 
-        this._settings.bind('custom-stack-path', get('custom_stack_path_entry'),
-            'text', Gio.SettingsBindFlags.DEFAULT);
-        this._settings.bind('custom-stack-name', get('custom_stack_name_entry'),
-            'text', Gio.SettingsBindFlags.DEFAULT);
-
-        [
-            'custom_stack_path_entry',
-            'custom_stack_browse_button',
-            'custom_stack_name_entry',
-        ].forEach(id => this._settings.bind('show-custom-stack', get(id), 'sensitive',
-            Gio.SettingsBindFlags.GET));
-
-        get('custom_stack_browse_button').connect('clicked',
+        get('custom_stacks_add_button').connect('clicked',
             () => this._chooseCustomStackFolder());
+        this._settings.connect('changed::custom-stacks',
+            () => this._updateCustomStacksList());
+        this._updateCustomStacksList();
+
+        get('stack_overrides_reset_button').connect('clicked', () => {
+            this._settings.reset('stack-view-overrides');
+            this._settings.reset('stack-sort-overrides');
+        });
 
         [
             ['stack_view_combo', 'stack-view'],
@@ -1262,14 +1258,65 @@ const DockSettings = GObject.registerClass({
             'sensitive', Gio.SettingsBindFlags.GET);
     }
 
+    /**
+     * Rebuild the list of folders the user added to the dock. Each row shows
+     * the folder and a button that takes it back out again.
+     */
+    _updateCustomStacksList() {
+        const listBox = this._builder.get_object('custom_stacks_listbox');
+        let row = listBox.get_first_child();
+        while (row) {
+            const next = row.get_next_sibling();
+            listBox.remove(row);
+            row = next;
+        }
+
+        const folders = this._settings.get_strv('custom-stacks');
+        this._builder.get_object('custom_stacks_frame').set_visible(folders.length > 0);
+
+        folders.forEach((folder, index) => {
+            const grid = new Gtk.Grid({
+                margin_start: 12, margin_end: 12, margin_top: 6, margin_bottom: 6,
+                column_spacing: 12,
+            });
+            const label = new Gtk.Label({
+                label: folder,
+                hexpand: true,
+                halign: Gtk.Align.START,
+                ellipsize: Pango.EllipsizeMode.MIDDLE,
+            });
+            grid.attach(label, 0, 0, 1, 1);
+
+            const remove = new Gtk.Button({
+                icon_name: 'user-trash-symbolic',
+                valign: Gtk.Align.CENTER,
+                tooltip_text: __('Remove this folder from the dock'),
+            });
+            remove.connect('clicked', () => {
+                const kept = this._settings.get_strv('custom-stacks');
+                kept.splice(index, 1);
+                this._settings.set_strv('custom-stacks', kept);
+            });
+            grid.attach(remove, 1, 0, 1, 1);
+
+            listBox.append(new Gtk.ListBoxRow({child: grid, activatable: false}));
+        });
+    }
+
     _chooseCustomStackFolder() {
-        const entry = this._builder.get_object('custom_stack_path_entry');
         const root = this.widget.get_root();
         const title = __('Choose a folder');
 
         const apply = folder => {
-            if (folder)
-                entry.set_text(folder.get_path() ?? folder.get_uri());
+            if (!folder)
+                return;
+
+            const path = folder.get_path() ?? folder.get_uri();
+            const folders = this._settings.get_strv('custom-stacks');
+            if (!folders.includes(path)) {
+                folders.push(path);
+                this._settings.set_strv('custom-stacks', folders);
+            }
         };
 
         if (Gtk.FileDialog) {

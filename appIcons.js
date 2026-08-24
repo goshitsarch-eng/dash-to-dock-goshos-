@@ -61,6 +61,13 @@ const LAUNCH_BOUNCE_AMPLITUDE = 0.35;
 // How long the icon takes to fade in or out when an application is hidden.
 const DIM_HIDDEN_TIME = 150;
 
+// The descriptor the show apps button uses when it pops a stack up: it shares
+// the view and sort choices of a dedicated Applications stack.
+const APPLICATIONS_STACK = Object.freeze({
+    id: Stacks.StackKind.APPLICATIONS,
+    kind: Stacks.StackKind.APPLICATIONS,
+});
+
 const clickAction = Object.freeze({
     SKIP: 0,
     MINIMIZE: 1,
@@ -1583,7 +1590,7 @@ export const DockShowAppsIcon = GObject.registerClass({
 
         if (!this._stackPopup) {
             this._stackPopup = new Stacks.StackPopupController(this,
-                Stacks.StackKind.APPLICATIONS, this._menuManager);
+                APPLICATIONS_STACK, this._menuManager);
         }
 
         if (this._stackPopup.isOpen)
@@ -1735,6 +1742,11 @@ class DockShowAppsIconMenu extends DockAppIconMenu {
             ? __('Show applications in the overview') : __('Show applications as a stack'));
         behaviour.connect('activate', () => settings.set_enum('show-apps-button-action',
             useStack ? Stacks.ShowAppsAction.OVERVIEW : Stacks.ShowAppsAction.STACK));
+
+        if (useStack) {
+            Stacks.addStackViewItems(this, APPLICATIONS_STACK);
+            this._appendSeparator();
+        }
 
         const item = this._appendMenuItem(_('Settings'));
         item.connect('activate', () =>

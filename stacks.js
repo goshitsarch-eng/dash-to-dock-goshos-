@@ -69,6 +69,10 @@ export const StackSort = Object.freeze({
     KIND: 2,
 });
 
+// The nicks the per-stack override dictionaries are stored with.
+const StackViewNicks = Object.freeze(['AUTOMATIC', 'FAN', 'GRID', 'LIST']);
+const StackSortNicks = Object.freeze(['NAME', 'DATE_MODIFIED', 'KIND']);
+
 /** Must match the show-apps-button-action enum in the gschema. */
 export const ShowAppsAction = Object.freeze({
     OVERVIEW: 0,
@@ -121,49 +125,56 @@ function ensureFilePromises(file) {
 }
 
 /**
- * The `Gio.File` a stack of the given kind points at.
+ * Turn a user supplied path or URI into a `Gio.File`.
  *
- * @param {string} kind one of `StackKind`
- * @returns {?Gio.File} the target folder, or null for non-folder stacks
+ * @param {string} pathOrUri an absolute path, a `~` path or an URI
+ * @returns {?Gio.File} the folder, or null when the string is empty
  */
-export function getStackLocation(kind) {
-    let path = null;
-
-    switch (kind) {
-    case StackKind.DOCUMENTS:
-        path = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS);
-        break;
-    case StackKind.DOWNLOADS:
-        path = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD);
-        break;
-    case StackKind.HOME:
-        path = GLib.get_home_dir();
-        break;
-    case StackKind.CUSTOM: {
-        const custom = Docking.DockManager.settings.customStackPath?.trim();
-        if (!custom)
-            return null;
-        if (custom.includes('://'))
-            return Gio.File.new_for_uri(custom);
-        path = custom.startsWith('~')
-            ? GLib.build_filenamev([GLib.get_home_dir(), custom.slice(1)]) : custom;
-        break;
-    }
-    default:
+export function fileForUserPath(pathOrUri) {
+    const trimmed = pathOrUri?.trim();
+    if (!trimmed)
         return null;
-    }
 
-    return path ? Gio.File.new_for_path(path) : null;
+    if (trimmed.includes('://'))
+        return Gio.File.new_for_uri(trimmed);
+
+    const path = trimmed.startsWith('~')
+        ? GLib.build_filenamev([GLib.get_home_dir(), trimmed.slice(1)]) : trimmed;
+    return Gio.File.new_for_path(path);
 }
 
 /**
- * The default, user visible name of a stack.
+ * The `Gio.File` a stack points at.
  *
- * @param {string} kind one of `StackKind`
- * @returns {string} the translated stack name
+ * @param {object} descriptor a stack descriptor
+ * @returns {?Gio.File} the target folder, or null for non-folder stacks
  */
-export function getStackName(kind) {
-    switch (kind) {
+export function getStackLocation(descriptor) {
+    switch (descriptor?.kind) {
+    case StackKind.DOCUMENTS:
+        return fileForUserPath(
+            GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS));
+    case StackKind.DOWNLOADS:
+        return fileForUserPath(
+            GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD));
+    case StackKind.HOME:
+        return fileForUserPath(GLib.get_home_dir());
+    case StackKind.CUSTOM:
+        return fileForUserPath(descriptor.path);
+    default:
+        return null;
+    }
+}
+
+/**
+ * The user visible name of a stack. Folders added by the user are named after
+ * the folder itself, like they are on macOS.
+ *
+ * @param {object} descriptor a stack descriptor
+ * @returns {string} the stack name
+ */
+export function getStackName(descriptor) {
+    switch (descriptor?.kind) {
     case StackKind.APPLICATIONS:
         return __('Applications');
     case StackKind.DOCUMENTS:
@@ -172,15 +183,67 @@ export function getStackName(kind) {
         return __('Downloads');
     case StackKind.HOME:
         return __('Home');
-    case StackKind.CUSTOM: {
-        const name = Docking.DockManager.settings.customStackName?.trim();
-        if (name)
-            return name;
-        return getStackLocation(kind)?.get_basename() ?? __('Folder');
-    }
+    case StackKind.CUSTOM:
+        return getStackLocation(descriptor)?.get_basename() ?? __('Folder');
     default:
         return __('Folder');
     }
+}
+
+/**
+ * The view a stack must use: its own choice from the right click menu, or the
+ * default from the preferences.
+ *
+ * @param {object} descriptor a stack descriptor
+ * @returns {number} a `StackView` value
+ */
+export function getStackView(descriptor) {
+    const {settings} = Docking.DockManager;
+    const nick = settings.stackViewOverrides?.[descriptor.id];
+    const index = StackViewNicks.indexOf(nick);
+    return index !== -1 ? index : settings.stackView;
+}
+
+/**
+ * The sort order a stack must use.
+ *
+ * @param {object} descriptor a stack descriptor
+ * @returns {number} a `StackSort` value
+ */
+export function getStackSort(descriptor) {
+    const {settings} = Docking.DockManager;
+    const nick = settings.stackSortOverrides?.[descriptor.id];
+    const index = StackSortNicks.indexOf(nick);
+    return index !== -1 ? index : settings.stackSort;
+}
+
+/**
+ * @param {string} key the settings key holding the override dictionary
+ * @param {string} id the stack id
+ * @param {string} nick the value to store
+ */
+function setStackOverride(key, id, nick) {
+    const {settings} = Docking.DockManager;
+    const camelKey = key.replace(/-([a-z\d])/g, k => k[1].toUpperCase());
+    const overrides = {...settings[camelKey]};
+    overrides[id] = nick;
+    settings.set_value(key, new GLib.Variant('a{ss}', overrides));
+}
+
+/**
+ * @param {object} descriptor a stack descriptor
+ * @param {number} view a `StackView` value
+ */
+export function setStackView(descriptor, view) {
+    setStackOverride('stack-view-overrides', descriptor.id, StackViewNicks[view]);
+}
+
+/**
+ * @param {object} descriptor a stack descriptor
+ * @param {number} sort a `StackSort` value
+ */
+export function setStackSort(descriptor, sort) {
+    setStackOverride('stack-sort-overrides', descriptor.id, StackSortNicks[sort]);
 }
 
 /**
@@ -205,26 +268,52 @@ function getStackFallbackIconName(kind) {
 }
 
 /**
- * The list of stack kinds that are currently enabled, in dock order.
+ * Every stack that is currently in the dock, in dock order. A descriptor is
+ * `{id, kind, path}`; the id is what per-stack view and sort choices are keyed
+ * on, so each folder keeps its own choice.
  *
- * @returns {string[]} the enabled stack kinds
+ * @returns {object[]} the stack descriptors
  */
-export function getEnabledStackKinds() {
+export function getStackDescriptors() {
     const {settings} = Docking.DockManager;
-    const kinds = [];
+    const descriptors = [];
 
     if (settings.showApplicationsStack)
-        kinds.push(StackKind.APPLICATIONS);
+        descriptors.push({id: StackKind.APPLICATIONS, kind: StackKind.APPLICATIONS});
     if (settings.showDocumentsStack)
-        kinds.push(StackKind.DOCUMENTS);
+        descriptors.push({id: StackKind.DOCUMENTS, kind: StackKind.DOCUMENTS});
     if (settings.showDownloadsStack)
-        kinds.push(StackKind.DOWNLOADS);
+        descriptors.push({id: StackKind.DOWNLOADS, kind: StackKind.DOWNLOADS});
     if (settings.showHomeStack)
-        kinds.push(StackKind.HOME);
-    if (settings.showCustomStack && getStackLocation(StackKind.CUSTOM))
-        kinds.push(StackKind.CUSTOM);
+        descriptors.push({id: StackKind.HOME, kind: StackKind.HOME});
 
-    return kinds;
+    const seen = new Set();
+    (settings.customStacks ?? []).forEach(path => {
+        const file = fileForUserPath(path);
+        if (!file || seen.has(file.get_uri()))
+            return;
+        seen.add(file.get_uri());
+        descriptors.push({
+            id: `${StackKind.CUSTOM}:${file.get_uri()}`,
+            kind: StackKind.CUSTOM,
+            path,
+        });
+    });
+
+    return descriptors;
+}
+
+/**
+ * Remove a folder the user added to the dock.
+ *
+ * @param {object} descriptor the stack descriptor to drop
+ */
+export function removeCustomStack(descriptor) {
+    const {settings} = Docking.DockManager;
+    const target = fileForUserPath(descriptor.path)?.get_uri();
+    const kept = (settings.customStacks ?? []).filter(path =>
+        fileForUserPath(path)?.get_uri() !== target);
+    settings.set_strv('custom-stacks', kept);
 }
 
 /**
@@ -264,8 +353,8 @@ class StackEntry {
  * Reads the contents a stack should show.
  */
 class StackContents {
-    constructor(kind) {
-        this._kind = kind;
+    constructor(descriptor) {
+        this._descriptor = descriptor;
         this._cancellable = null;
     }
 
@@ -275,17 +364,17 @@ class StackContents {
     }
 
     get location() {
-        return getStackLocation(this._kind);
+        return getStackLocation(this._descriptor);
     }
 
     async read() {
         this._cancellable?.cancel();
         this._cancellable = new Gio.Cancellable();
 
-        const entries = this._kind === StackKind.APPLICATIONS
+        const entries = this._descriptor.kind === StackKind.APPLICATIONS
             ? readApplications() : await this._readFolder(this._cancellable);
 
-        return sortEntries(entries);
+        return sortEntries(entries, this._descriptor);
     }
 
     async _readFolder(cancellable) {
@@ -327,7 +416,7 @@ class StackContents {
             }
         } catch (e) {
             if (!e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                logError(e, `Could not read the ${this._kind} stack`);
+                logError(e, `Could not read the ${this._descriptor.id} stack`);
         } finally {
             try {
                 await enumerator?.close_async(GLib.PRIORITY_DEFAULT, null);
@@ -367,11 +456,10 @@ function readApplications() {
  * @param {StackEntry[]} entries the entries to sort in place
  * @returns {StackEntry[]} the same array, sorted according to the settings
  */
-function sortEntries(entries) {
-    const {settings} = Docking.DockManager;
+function sortEntries(entries, descriptor) {
     const collate = (a, b) => a.name.localeCompare(b.name);
 
-    switch (settings.stackSort) {
+    switch (getStackSort(descriptor)) {
     case StackSort.DATE_MODIFIED:
         entries.sort((a, b) => b.modified - a.modified || collate(a, b));
         break;
@@ -438,10 +526,10 @@ class StackTile extends St.Button {
  * The popup shown when a stack is clicked.
  */
 const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
-    constructor(source, kind) {
+    constructor(source, descriptor) {
         super(source, 0.5, Utils.getPosition());
 
-        this._kind = kind;
+        this._descriptor = descriptor;
         this._extraActors = [];
         this._signalsHandler = new Utils.GlobalSignalsHandler(this);
         this.blockSourceEvents = true;
@@ -473,14 +561,13 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         this._extraActors.forEach(actor => actor.destroy());
         this._extraActors = [];
 
-        const {settings} = Docking.DockManager;
-        let view = settings.stackView;
+        let view = getStackView(this._descriptor);
 
         if (view === StackView.AUTOMATIC) {
-            if (this._kind === StackKind.APPLICATIONS)
-                view = StackView.GRID;
-            else
-                view = entries.length <= FAN_MAX_ITEMS ? StackView.FAN : StackView.GRID;
+            // Same rule as macOS: a fan for a handful of items, a grid once
+            // there are too many for the arc to stay readable.
+            view = entries.length <= FAN_MAX_ITEMS && !this._isApplications
+                ? StackView.FAN : StackView.GRID;
         }
 
         if (!entries.length)
@@ -492,13 +579,17 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         else
             this._buildGrid(entries);
 
-        const location = getStackLocation(this._kind);
+        const location = getStackLocation(this._descriptor);
         if (location) {
             this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
             const open = new PopupMenu.PopupMenuItem(__('Open in Files'));
             open.connect('activate', () => openUri(location.get_uri()));
             this.addMenuItem(open);
         }
+    }
+
+    get _isApplications() {
+        return this._descriptor.kind === StackKind.APPLICATIONS;
     }
 
     _activateEntry(entry) {
@@ -509,7 +600,7 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
 
     _limit(entries) {
         const {settings} = Docking.DockManager;
-        const max = this._kind === StackKind.APPLICATIONS
+        const max = this._isApplications
             ? HARD_ITEM_LIMIT : Math.max(1, settings.stackMaxItems);
         return entries.slice(0, max);
     }
@@ -625,10 +716,10 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
  * options, plus the usual dock entries.
  */
 const DockStackOptionsMenu = class DockStackOptionsMenu extends PopupMenu.PopupMenu {
-    constructor(source, kind) {
+    constructor(source, descriptor) {
         super(source, 0.5, Utils.getPosition());
 
-        this._kind = kind;
+        this._descriptor = descriptor;
         this.blockSourceEvents = true;
         this.actor.add_style_class_name('app-menu');
         this.actor.add_style_class_name('dock-app-menu');
@@ -643,42 +734,21 @@ const DockStackOptionsMenu = class DockStackOptionsMenu extends PopupMenu.PopupM
 
     _rebuild() {
         this.removeAll();
-        const {settings} = Docking.DockManager;
-
-        this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(__('Sort by')));
-        [
-            [StackSort.NAME, __('Name')],
-            [StackSort.DATE_MODIFIED, __('Date Modified')],
-            [StackSort.KIND, __('Kind')],
-        ].forEach(([value, label]) => {
-            const item = new PopupMenu.PopupMenuItem(label);
-            if (settings.stackSort === value)
-                item.setOrnament(PopupMenu.Ornament.DOT);
-            item.connect('activate', () => settings.set_enum('stack-sort', value));
-            this.addMenuItem(item);
-        });
-
-        this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(__('View content as')));
-        [
-            [StackView.AUTOMATIC, __('Automatic')],
-            [StackView.FAN, __('Fan')],
-            [StackView.GRID, __('Grid')],
-            [StackView.LIST, __('List')],
-        ].forEach(([value, label]) => {
-            const item = new PopupMenu.PopupMenuItem(label);
-            if (settings.stackView === value)
-                item.setOrnament(PopupMenu.Ornament.DOT);
-            item.connect('activate', () => settings.set_enum('stack-view', value));
-            this.addMenuItem(item);
-        });
+        addStackViewItems(this, this._descriptor);
 
         this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        const location = getStackLocation(this._kind);
+        const location = getStackLocation(this._descriptor);
         if (location) {
             const open = new PopupMenu.PopupMenuItem(__('Open in Files'));
             open.connect('activate', () => openUri(location.get_uri()));
             this.addMenuItem(open);
+        }
+
+        if (this._descriptor.kind === StackKind.CUSTOM) {
+            const remove = new PopupMenu.PopupMenuItem(__('Remove from Dock'));
+            remove.connect('activate', () => removeCustomStack(this._descriptor));
+            this.addMenuItem(remove);
         }
 
         const prefs = new PopupMenu.PopupMenuItem(_('Settings'));
@@ -688,17 +758,56 @@ const DockStackOptionsMenu = class DockStackOptionsMenu extends PopupMenu.PopupM
 };
 
 /**
+ * Append the macOS "Sort by" and "View content as" sections to a menu. Every
+ * stack — Applications, Documents, Downloads, Home and each folder the user
+ * added — keeps its own choice, keyed on the stack id.
+ *
+ * @param {PopupMenu.PopupMenuBase} menu the menu to append to
+ * @param {object} descriptor the stack descriptor
+ */
+export function addStackViewItems(menu, descriptor) {
+    const currentSort = getStackSort(descriptor);
+    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(__('Sort by')));
+    [
+        [StackSort.NAME, __('Name')],
+        [StackSort.DATE_MODIFIED, __('Date Modified')],
+        [StackSort.KIND, __('Kind')],
+    ].forEach(([value, label]) => {
+        const item = new PopupMenu.PopupMenuItem(label);
+        if (currentSort === value)
+            item.setOrnament(PopupMenu.Ornament.DOT);
+        item.connect('activate', () => setStackSort(descriptor, value));
+        menu.addMenuItem(item);
+    });
+
+    const currentView = getStackView(descriptor);
+    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(__('View content as')));
+    [
+        [StackView.FAN, __('Fan')],
+        [StackView.GRID, __('Grid')],
+        [StackView.LIST, __('List')],
+        [StackView.AUTOMATIC, __('Automatic')],
+    ].forEach(([value, label]) => {
+        const item = new PopupMenu.PopupMenuItem(label);
+        if (currentView === value)
+            item.setOrnament(PopupMenu.Ornament.DOT);
+        item.connect('activate', () => setStackView(descriptor, value));
+        menu.addMenuItem(item);
+    });
+}
+
+/**
  * Owns the stack popup of a dock item. Used both by the dedicated stack icons
  * and by the "Show Applications" button when it is configured to open a stack.
  */
 export class StackPopupController {
-    constructor(source, kind, menuManager) {
+    constructor(source, descriptor, menuManager) {
         this._source = source;
-        this._kind = kind;
+        this._descriptor = descriptor;
         this._menuManager = menuManager;
         this._menu = null;
         this._optionsMenu = null;
-        this._contents = new StackContents(kind);
+        this._contents = new StackContents(descriptor);
     }
 
     destroy() {
@@ -721,7 +830,7 @@ export class StackPopupController {
 
     async popup() {
         if (!this._menu) {
-            this._menu = new DockStackMenu(this._source, this._kind);
+            this._menu = new DockStackMenu(this._source, this._descriptor);
             this._menu.connect('open-state-changed', (_menu, isOpen) =>
                 this._source?.onStackMenuStateChanged?.(isOpen));
             this._menu.connect('destroy', () => (this._menu = null));
@@ -732,7 +841,7 @@ export class StackPopupController {
         try {
             entries = await this._contents.read();
         } catch (e) {
-            logError(e, `Could not read the ${this._kind} stack`);
+            logError(e, `Could not read the ${this._descriptor.id} stack`);
         }
 
         if (!this._menu)
@@ -745,7 +854,7 @@ export class StackPopupController {
 
     popupOptions() {
         if (!this._optionsMenu) {
-            this._optionsMenu = new DockStackOptionsMenu(this._source, this._kind);
+            this._optionsMenu = new DockStackOptionsMenu(this._source, this._descriptor);
             this._optionsMenu.connect('open-state-changed', (_menu, isOpen) =>
                 this._source?.onStackMenuStateChanged?.(isOpen));
             this._optionsMenu.connect('destroy', () => (this._optionsMenu = null));
@@ -824,10 +933,10 @@ export const DockStackIcon = GObject.registerClass({
         'sync-tooltip': {},
     },
 }, class DockStackIcon extends Dash.DashItemContainer {
-    _init(kind, position) {
+    _init(descriptor, position) {
         super._init();
 
-        this.kind = kind;
+        this.descriptor = descriptor;
         this._position = position;
 
         this.toggleButton = new St.Button({
@@ -837,7 +946,7 @@ export const DockStackIcon = GObject.registerClass({
             y_expand: false,
         });
 
-        this.icon = new IconGrid.BaseIcon(getStackName(kind), {
+        this.icon = new IconGrid.BaseIcon(getStackName(descriptor), {
             setSizeManually: true,
             showLabel: false,
             createIcon: size => this._createIcon(size),
@@ -847,14 +956,14 @@ export const DockStackIcon = GObject.registerClass({
         this.toggleButton.add_child(this.icon);
         this.toggleButton._delegate = this;
         this.setChild(this.toggleButton);
-        this.setLabelText(getStackName(kind));
+        this.setLabelText(getStackName(descriptor));
 
         this.label?.add_style_class_name(Theming.PositionStyleClass[position]);
         if (Docking.DockManager.settings.customThemeShrink)
             this.label?.add_style_class_name('shrink');
 
         this._menuManager = new PopupMenu.PopupMenuManager(this);
-        this._popup = new StackPopupController(this, kind, this._menuManager);
+        this._popup = new StackPopupController(this, descriptor, this._menuManager);
 
         this.toggleButton.connect('clicked', () => this._onClicked());
         this._enableSecondaryClick();
@@ -915,8 +1024,12 @@ export const DockStackIcon = GObject.registerClass({
         this.icon.setIconSize(size);
     }
 
+    get kind() {
+        return this.descriptor.kind;
+    }
+
     updateName() {
-        this.setLabelText(getStackName(this.kind));
+        this.setLabelText(getStackName(this.descriptor));
         this._gicon = null;
         this.icon?.update();
         this._updateGicon().catch(e => logError(e));
@@ -943,7 +1056,7 @@ export const DockStackIcon = GObject.registerClass({
     }
 
     async _updateGicon() {
-        const location = getStackLocation(this.kind);
+        const location = getStackLocation(this.descriptor);
         if (!location)
             return;
 
@@ -958,7 +1071,7 @@ export const DockStackIcon = GObject.registerClass({
             this.icon?.update();
         } catch (e) {
             if (!e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
-                logError(e, `Could not read the ${this.kind} stack icon`);
+                logError(e, `Could not read the ${this.descriptor.id} stack icon`);
         }
     }
 
@@ -1001,9 +1114,7 @@ class DockStacksContainer extends St.BoxLayout {
             'changed::show-documents-stack',
             'changed::show-downloads-stack',
             'changed::show-home-stack',
-            'changed::show-custom-stack',
-            'changed::custom-stack-path',
-            'changed::custom-stack-name',
+            'changed::custom-stacks',
             'changed::show-stacks-separator',
         ].forEach(key => this._signalsHandler.add(settings, key, () => this.update()));
 
@@ -1035,21 +1146,22 @@ class DockStacksContainer extends St.BoxLayout {
     }
 
     update() {
-        const kinds = getEnabledStackKinds();
+        const descriptors = getStackDescriptors();
+        const ids = new Set(descriptors.map(d => d.id));
 
-        [...this._stacks.keys()].forEach(kind => {
-            if (!kinds.includes(kind)) {
-                this._stacks.get(kind).destroy();
-                this._stacks.delete(kind);
+        [...this._stacks.keys()].forEach(id => {
+            if (!ids.has(id)) {
+                this._stacks.get(id).destroy();
+                this._stacks.delete(id);
             }
         });
 
-        this._updateSeparator(kinds.length > 0);
+        this._updateSeparator(descriptors.length > 0);
 
-        kinds.forEach(kind => {
-            let stack = this._stacks.get(kind);
+        descriptors.forEach(descriptor => {
+            let stack = this._stacks.get(descriptor.id);
             if (!stack) {
-                stack = new DockStackIcon(kind, this._position);
+                stack = new DockStackIcon(descriptor, this._position);
                 // Same treatment as the show apps button: never claim the
                 // extra space of an extended dock.
                 stack.x_expand = false;
@@ -1058,7 +1170,7 @@ class DockStacksContainer extends St.BoxLayout {
                     stack.y_align = Clutter.ActorAlign.START;
                 stack.setIconSize(this._dash.iconSize);
                 this._dash.hookUpStackItem(stack);
-                this._stacks.set(kind, stack);
+                this._stacks.set(descriptor.id, stack);
                 this.add_child(stack);
                 stack.show(false);
             } else {
@@ -1067,7 +1179,7 @@ class DockStacksContainer extends St.BoxLayout {
             this.set_child_above_sibling(stack, null);
         });
 
-        this.visible = kinds.length > 0;
+        this.visible = descriptors.length > 0;
         this._dash.onStacksChanged();
     }
 
