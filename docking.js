@@ -2574,15 +2574,10 @@ export class DockManager {
         const {checked} = button;
         const {overviewControls} = this;
 
-        if (this._settings.showAppsButtonAction === Stacks.ShowAppsAction.STACK) {
-            if (checked && !this._togglingShowAppsStack) {
-                this._togglingShowAppsStack = true;
-                button.checked = false;
-                this._togglingShowAppsStack = false;
-                this.mainDock.dash.popupApplicationsStack();
-            }
+        // The button pops the applications stack up instead, and never
+        // toggles the overview: see DockShowAppsIcon.
+        if (this._settings.showAppsButtonAction === Stacks.ShowAppsAction.STACK)
             return;
-        }
 
         if (!Main.overview.visible) {
             this.mainDock.dash.showAppsButton._fromDesktop = true;

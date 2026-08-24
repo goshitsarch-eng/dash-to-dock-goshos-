@@ -116,7 +116,9 @@ export class DockMagnifier {
         this._range = 2;
         this._frozen = 0;
         this._savedBackground = null;
-        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        // No parent object: DockMagnifier is a plain class with no 'destroy'
+        // signal, and the dash destroys it explicitly from its own _onDestroy.
+        this._signalsHandler = new Utils.GlobalSignalsHandler();
 
         const {settings} = Docking.DockManager;
         this._signalsHandler.add([

@@ -678,25 +678,6 @@ export const DockDash = GObject.registerClass({
     }
 
     /**
-     * Pop up the applications stack from the show apps button.
-     */
-    popupApplicationsStack() {
-        if (!this._showAppsStack) {
-            this._showAppsStack = new Stacks.StackPopupController(this._showAppsIcon,
-                Stacks.StackKind.APPLICATIONS, this._showAppsIcon.menuManager);
-            this.connect('destroy', () => {
-                this._showAppsStack?.destroy();
-                this._showAppsStack = null;
-            });
-        }
-
-        if (this._showAppsStack.isOpen)
-            this._showAppsStack.close();
-        else
-            this._showAppsStack.popup().catch(e => logError(e));
-    }
-
-    /**
      * Return an array with the "proper" appIcons currently in the dash
      */
     getAppIcons() {

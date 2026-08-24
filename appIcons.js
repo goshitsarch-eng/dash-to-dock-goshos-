@@ -1539,6 +1539,62 @@ export const DockShowAppsIcon = GObject.registerClass({
         this._menuTimeoutId = 0;
 
         this._maybeEnablePopupGestures();
+
+        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::show-apps-button-action', () => this._updateShowAppsAction());
+        this.toggleButton.connect('clicked', () => {
+            if (this._usesStack())
+                this._toggleApplicationsStack();
+        });
+        this.connect('destroy', () => {
+            this._stackPopup?.destroy();
+            this._stackPopup = null;
+        });
+        this._updateShowAppsAction();
+    }
+
+    _usesStack() {
+        return Docking.DockManager.settings.showAppsButtonAction ===
+            Stacks.ShowAppsAction.STACK;
+    }
+
+    /**
+     * In stack mode the button must not behave like a toggle at all, so that
+     * nothing in the shell mistakes it for a request to enter the overview.
+     */
+    _updateShowAppsAction() {
+        const usesStack = this._usesStack();
+        this.toggleButton.toggle_mode = !usesStack;
+
+        if (!usesStack) {
+            this._stackPopup?.destroy();
+            this._stackPopup = null;
+            return;
+        }
+
+        this.toggleButton.checked = false;
+    }
+
+    _toggleApplicationsStack() {
+        this._removeMenuTimeout();
+
+        if (!this._stackPopup) {
+            this._stackPopup = new Stacks.StackPopupController(this,
+                Stacks.StackKind.APPLICATIONS, this._menuManager);
+        }
+
+        if (this._stackPopup.isOpen)
+            this._stackPopup.close();
+        else
+            this._stackPopup.popup().catch(e => logError(e));
+    }
+
+    onStackMenuStateChanged(isOpen) {
+        if (isOpen)
+            this.toggleButton.set_hover(true);
+
+        this.emit('menu-state-changed', isOpen);
     }
 
     _createIcon(size) {
@@ -1586,10 +1642,6 @@ export const DockShowAppsIcon = GObject.registerClass({
     vfunc_get_preferred_height(forWidth) {
         const [min, nat] = super.vfunc_get_preferred_height(forWidth);
         return Magnification.adjustPreferredSize(this, min, nat, false);
-    }
-
-    get menuManager() {
-        return this._menuManager;
     }
 
     setForcedHighlight(...args) {
