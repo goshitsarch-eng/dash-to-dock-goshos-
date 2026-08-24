@@ -347,9 +347,15 @@ function readApplications() {
     const parentalControls = ParentalControlsManager.getDefault();
     const appSystem = Shell.AppSystem.get_default();
 
-    return appSystem.get_installed().filter(appInfo =>
-        appInfo.should_show() && parentalControls.shouldShowApp(appInfo)
-    ).map(appInfo => new StackEntry({
+    return appSystem.get_installed().filter(appInfo => {
+        try {
+            // Catches the invalid file encodings upstream guards against too.
+            appInfo.get_id();
+        } catch {
+            return false;
+        }
+        return appInfo.should_show() && parentalControls.shouldShowApp(appInfo);
+    }).map(appInfo => new StackEntry({
         name: appInfo.get_display_name() || appInfo.get_name(),
         gicon: appInfo.get_icon(),
         app: appSystem.lookup_app(appInfo.get_id()),
