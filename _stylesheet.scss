@@ -529,18 +529,14 @@ $dock_style_modes: null, shrink, extended, extended-shrink;
 }
 
 .goshos-stack-grid {
+    // Row and column spacing is set on the Clutter.GridLayout from JS: St
+    // does not map CSS spacing onto it.
     padding: $base_padding;
-    spacing-rows: $base_padding;
-    spacing-columns: $base_padding;
 }
 
 .goshos-stack-scrollview {
     // The maximum height is set from JS, based on the monitor size.
     padding: 0;
-}
-
-.goshos-stack-fan {
-    padding: $base_padding;
 }
 
 .goshos-stack-tile {

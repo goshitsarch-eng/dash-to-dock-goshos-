@@ -93,6 +93,7 @@ const GRID_MAX_COLUMNS = 6;
 const LIST_ICON_SIZE = 22;
 const TILE_ICON_SIZE = 48;
 const FAN_TILE_GAP = 6;
+const GRID_SPACING = 6;
 
 const promisifiedPrototypes = new Set();
 
@@ -539,6 +540,9 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
             orientation: Clutter.Orientation.HORIZONTAL,
             column_homogeneous: true,
             row_homogeneous: true,
+            // St does not map CSS spacing onto a Clutter.GridLayout.
+            column_spacing: GRID_SPACING,
+            row_spacing: GRID_SPACING,
         });
         const grid = new St.Widget({
             style_class: 'goshos-stack-grid',

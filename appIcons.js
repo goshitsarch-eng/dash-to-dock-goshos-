@@ -58,6 +58,9 @@ const Labels = Object.freeze({
 // the icon size.
 const LAUNCH_BOUNCE_AMPLITUDE = 0.35;
 
+// How long the icon takes to fade in or out when an application is hidden.
+const DIM_HIDDEN_TIME = 150;
+
 const clickAction = Object.freeze({
     SKIP: 0,
     MINIMIZE: 1,
@@ -215,13 +218,12 @@ export const DockAbstractAppIcon = GObject.registerClass({
         this._progressOverlayArea = null;
         this._progress = 0;
 
-        [
-            'dim-hidden-applications',
-            'hidden-applications-opacity',
-        ].forEach(key => {
-            this._signalsHandler.add(Docking.DockManager.settings,
-                `changed::${key}`, () => this._updateHiddenState());
-        });
+        // Toggling the setting also has to start or stop tracking the
+        // minimized state of the windows, which _updateState() does.
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::dim-hidden-applications', () => this._updateState());
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::hidden-applications-opacity', () => this._updateHiddenState());
 
         this._signalsHandler.add(Docking.DockManager.settings,
             'changed::launch-bounce-animation', () => this._updateLaunchAnimation());
@@ -395,7 +397,7 @@ export const DockAbstractAppIcon = GObject.registerClass({
         icon.remove_transition('opacity');
         icon.ease({
             opacity,
-            duration: DASH_ITEM_LABEL_SHOW_TIME,
+            duration: DIM_HIDDEN_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
     }
