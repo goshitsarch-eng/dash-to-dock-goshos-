@@ -824,7 +824,6 @@ export const DockStackIcon = GObject.registerClass({
             style_class: 'show-apps',
             track_hover: true,
             can_focus: true,
-            toggle_mode: true,
             y_expand: false,
         });
 
@@ -848,12 +847,7 @@ export const DockStackIcon = GObject.registerClass({
         this._popup = new StackPopupController(this, kind, this._menuManager);
 
         this.toggleButton.connect('clicked', () => this._onClicked());
-        this.toggleButton.connect('button-press-event', (_actor, event) => {
-            if (event.get_button() !== Clutter.BUTTON_SECONDARY)
-                return Clutter.EVENT_PROPAGATE;
-            this._popup.popupOptions();
-            return Clutter.EVENT_STOP;
-        });
+        this._enableSecondaryClick();
         this.connect('destroy', () => this._onDestroy());
 
         this._updateGicon().catch(e => logError(e));
@@ -862,6 +856,30 @@ export const DockStackIcon = GObject.registerClass({
     _onDestroy() {
         this._popup?.destroy();
         this._popup = null;
+    }
+
+    /**
+     * Right click opens the macOS "Sort by" / "View content as" menu. Newer
+     * shells route pointer buttons through gestures, older ones still emit
+     * button-press-event.
+     */
+    _enableSecondaryClick() {
+        if (Clutter.ClickGesture) {
+            const rightClick = new Clutter.ClickGesture({
+                required_button: Clutter.BUTTON_SECONDARY,
+                recognize_on_press: true,
+            });
+            rightClick.connect('recognize', () => this._popup?.popupOptions());
+            this.add_action(rightClick);
+            return;
+        }
+
+        this.toggleButton.connect('button-press-event', (_actor, event) => {
+            if (event.get_button() !== Clutter.BUTTON_SECONDARY)
+                return Clutter.EVENT_PROPAGATE;
+            this._popup?.popupOptions();
+            return Clutter.EVENT_STOP;
+        });
     }
 
     showLabel(...args) {
@@ -889,7 +907,9 @@ export const DockStackIcon = GObject.registerClass({
 
     updateName() {
         this.setLabelText(getStackName(this.kind));
+        this._gicon = null;
         this.icon?.update();
+        this._updateGicon().catch(e => logError(e));
     }
 
     onStackMenuStateChanged(isOpen) {
@@ -900,10 +920,15 @@ export const DockStackIcon = GObject.registerClass({
     }
 
     _createIcon(size) {
+        const fallbackIconName = getStackFallbackIconName(this.kind);
+
+        if (!this._gicon)
+            return new St.Icon({iconName: fallbackIconName, iconSize: size});
+
         return new St.Icon({
-            gicon: this._gicon ?? null,
-            fallback_icon_name: getStackFallbackIconName(this.kind),
-            icon_size: size,
+            gicon: this._gicon,
+            fallbackIconName,
+            iconSize: size,
         });
     }
 
@@ -1015,6 +1040,12 @@ class DockStacksContainer extends St.BoxLayout {
             let stack = this._stacks.get(kind);
             if (!stack) {
                 stack = new DockStackIcon(kind, this._position);
+                // Same treatment as the show apps button: never claim the
+                // extra space of an extended dock.
+                stack.x_expand = false;
+                stack.y_expand = false;
+                if (!this._horizontal)
+                    stack.y_align = Clutter.ActorAlign.START;
                 stack.setIconSize(this._dash.iconSize);
                 this._dash.hookUpStackItem(stack);
                 this._stacks.set(kind, stack);
