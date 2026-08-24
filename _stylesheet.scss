@@ -517,3 +517,52 @@ $dock_style_modes: null, shrink, extended, extended-shrink;
         background-size: contain;
     }
 }
+
+// goshos-dock: macOS style stacks
+//
+// The popup reuses the shell popup-menu chrome, so only the content needs
+// styling here.
+.goshos-stack-menu {
+    .popup-menu-content {
+        padding: $base_padding;
+    }
+}
+
+.goshos-stack-grid {
+    padding: $base_padding;
+    spacing-rows: $base_padding;
+    spacing-columns: $base_padding;
+}
+
+.goshos-stack-scrollview {
+    // The maximum height is set from JS, based on the monitor size.
+    padding: 0;
+}
+
+.goshos-stack-fan {
+    padding: $base_padding;
+}
+
+.goshos-stack-tile {
+    padding: $base_padding;
+    border-radius: $base_border_radius;
+    width: 96px;
+    text-align: center;
+    transition-duration: 100ms;
+
+    &:hover,
+    &:focus {
+        background-color: $remark_color;
+    }
+
+    &:active {
+        background-color: transparentize($fg_color, .8);
+    }
+}
+
+.goshos-stack-tile-label {
+    font-size: 0.9em;
+    max-width: 84px;
+    padding-top: $base_margin;
+    color: $fg_color;
+}

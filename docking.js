@@ -37,6 +37,7 @@ import {
     LauncherAPI,
     Locations,
     NotificationsMonitor,
+    Stacks,
     Theming,
     Utils,
 } from './imports.js';
@@ -594,6 +595,16 @@ const DockedDash = GObject.registerClass({
             () => {
                 this.dash.resetAppIcons();
             },
+        ], [
+            settings,
+            'changed::show-recent-applications',
+            () => this.dash.resetAppIcons(),
+            Utils.SignalsHandlerFlags.CONNECT_AFTER,
+        ], [
+            settings,
+            'changed::recent-applications-limit',
+            () => this.dash.resetAppIcons(),
+            Utils.SignalsHandlerFlags.CONNECT_AFTER,
         ], [
             settings,
             'changed::show-apps-always-in-the-edge',
@@ -2563,6 +2574,16 @@ export class DockManager {
         const {checked} = button;
         const {overviewControls} = this;
 
+        if (this._settings.showAppsButtonAction === Stacks.ShowAppsAction.STACK) {
+            if (checked && !this._togglingShowAppsStack) {
+                this._togglingShowAppsStack = true;
+                button.checked = false;
+                this._togglingShowAppsStack = false;
+                this.mainDock.dash.popupApplicationsStack();
+            }
+            return;
+        }
+
         if (!Main.overview.visible) {
             this.mainDock.dash.showAppsButton._fromDesktop = true;
             Main.overview.show(OverviewControls.ControlsState.APP_GRID);
@@ -2677,6 +2698,7 @@ export class IconAnimator {
         this._started = false;
         this._animations = {
             wiggle: [],
+            bounce: [],
         };
         this._timeline = new Clutter.Timeline({
             duration: AnimationUtils.adjustAnimationTime(ICON_ANIMATOR_DURATION) || 1,
@@ -2694,6 +2716,23 @@ export class IconAnimator {
             const wigglers = this._animations.wiggle;
             for (let i = 0, iMax = wigglers.length; i < iMax; i++)
                 wigglers[i].target.rotation_angle_z = wiggleRotation;
+
+            // Two damped hops out of the dock, then a rest, repeated for as
+            // long as the application keeps starting up.
+            const bouncers = this._animations.bounce;
+            if (!bouncers.length)
+                return;
+
+            const hopSpan = 1 / 2;
+            const hop = progress < hopSpan ? progress / hopSpan : 1;
+            const bounce = hop < 1
+                ? Math.abs(Math.sin(hop * 2 * Math.PI)) * (1 - hop) : 0;
+            for (let i = 0, iMax = bouncers.length; i < iMax; i++) {
+                const {target} = bouncers[i];
+                const {axis, amplitude} = target._dockBounce ?? {};
+                if (axis)
+                    target[axis] = bounce * amplitude;
+            }
         });
     }
 
