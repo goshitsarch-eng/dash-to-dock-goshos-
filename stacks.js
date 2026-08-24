@@ -657,7 +657,10 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
             column_spacing: GRID_SPACING,
             row_spacing: GRID_SPACING,
         });
-        const grid = new St.Widget({
+        // St.ScrollView only accepts a child implementing StScrollable, which
+        // a plain St.Widget does not: St.Viewport is the scrollable container
+        // the shell's own icon grid uses.
+        const grid = new St.Viewport({
             style_class: 'goshos-stack-grid',
             layout_manager: layout,
             x_expand: true,
@@ -954,15 +957,15 @@ export const DockStackIcon = GObject.registerClass({
 
         this.descriptor = descriptor;
         this._position = position;
+        this._stackName = getStackName(descriptor);
 
         this.toggleButton = new St.Button({
             style_class: 'show-apps',
             track_hover: true,
             can_focus: true,
-            y_expand: false,
         });
 
-        this.icon = new IconGrid.BaseIcon(getStackName(descriptor), {
+        this.icon = new IconGrid.BaseIcon(this._stackName, {
             setSizeManually: true,
             showLabel: false,
             createIcon: size => this._createIcon(size),
@@ -972,7 +975,10 @@ export const DockStackIcon = GObject.registerClass({
         this.toggleButton.add_child(this.icon);
         this.toggleButton._delegate = this;
         this.setChild(this.toggleButton);
-        this.setLabelText(getStackName(descriptor));
+        // setChild() forces y_expand on, the same way the show apps button has
+        // to undo it after chaining up.
+        this.toggleButton.y_expand = false;
+        this.setLabelText(this._stackName);
 
         this.label?.add_style_class_name(Theming.PositionStyleClass[position]);
         if (Docking.DockManager.settings.customThemeShrink)
@@ -980,6 +986,7 @@ export const DockStackIcon = GObject.registerClass({
 
         this._menuManager = new PopupMenu.PopupMenuManager(this);
         this._popup = new StackPopupController(this, descriptor, this._menuManager);
+        this._iconCancellable = new Gio.Cancellable();
 
         this.toggleButton.connect('clicked', () => this._onClicked());
         this._enableSecondaryClick();
@@ -989,6 +996,8 @@ export const DockStackIcon = GObject.registerClass({
     }
 
     _onDestroy() {
+        this._iconCancellable?.cancel();
+        this._iconCancellable = null;
         this._popup?.destroy();
         this._popup = null;
     }
@@ -1005,7 +1014,9 @@ export const DockStackIcon = GObject.registerClass({
                 recognize_on_press: true,
             });
             rightClick.connect('recognize', () => this._popup?.popupOptions());
-            this.add_action(rightClick);
+            // The container is not reactive, so the gesture has to live on the
+            // button, which is also what the older code path uses.
+            this.toggleButton.add_action(rightClick);
             return;
         }
 
@@ -1044,8 +1055,17 @@ export const DockStackIcon = GObject.registerClass({
         return this.descriptor.kind;
     }
 
-    updateName() {
-        this.setLabelText(getStackName(this.descriptor));
+    get stackName() {
+        return this._stackName;
+    }
+
+    /**
+     * @param {object} descriptor the refreshed descriptor for this stack
+     */
+    updateDescriptor(descriptor) {
+        this.descriptor = descriptor;
+        this._stackName = getStackName(descriptor);
+        this.setLabelText(this._stackName);
         this._gicon = null;
         this.icon?.update();
         this._updateGicon().catch(e => logError(e));
@@ -1073,16 +1093,15 @@ export const DockStackIcon = GObject.registerClass({
 
     async _updateGicon() {
         const location = getStackLocation(this.descriptor);
-        if (!location)
+        const cancellable = this._iconCancellable;
+        if (!location || !cancellable)
             return;
 
         try {
             ensureFilePromises(location);
             const info = await location.query_info_async(
                 Gio.FILE_ATTRIBUTE_STANDARD_ICON, Gio.FileQueryInfoFlags.NONE,
-                GLib.PRIORITY_LOW, null);
-            if (this.is_finalized?.())
-                return;
+                GLib.PRIORITY_LOW, cancellable);
             this._gicon = info.get_icon();
             this.icon?.update();
         } catch (e) {
@@ -1189,8 +1208,12 @@ class DockStacksContainer extends St.BoxLayout {
                 this._stacks.set(descriptor.id, stack);
                 this.add_child(stack);
                 stack.show(false);
-            } else {
-                stack.updateName();
+            } else if (stack.descriptor.path !== descriptor.path ||
+                       stack.stackName !== getStackName(descriptor)) {
+                // Only rebuild the icon when it would actually change: an
+                // unrelated settings change must not flash every stack back to
+                // its fallback icon.
+                stack.updateDescriptor(descriptor);
             }
             this.set_child_above_sibling(stack, null);
         });

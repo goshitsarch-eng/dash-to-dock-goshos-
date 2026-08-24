@@ -629,8 +629,10 @@ export const DockDash = GObject.registerClass({
      * @param {Clutter.Actor} stack the stack item
      */
     hookUpStackItem(stack) {
+        // No scroll-into-view hook here: stack items live beside the scroll
+        // view, and ensureActorVisibleInScrollView() throws for actors that
+        // are not inside it.
         this._hookUpLabel(stack, stack);
-        stack.toggleButton.connect('notify::hover', a => this._ensureItemVisibility(a));
         stack.connect('menu-state-changed', (_icon, opened) =>
             this._itemMenuStateChanged(stack, opened));
     }
