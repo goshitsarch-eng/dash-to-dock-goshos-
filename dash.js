@@ -24,6 +24,8 @@ import {
 import {
     AppIcons,
     Docking,
+    Magnification,
+    Stacks,
     Theming,
     Utils,
 } from './imports.js';
@@ -57,6 +59,16 @@ class DockDashItemContainer extends Dash.DashItemContainer {
 
     showLabel() {
         return AppIcons.itemShowLabel.call(this);
+    }
+
+    vfunc_get_preferred_width(forHeight) {
+        const [min, nat] = super.vfunc_get_preferred_width(forHeight);
+        return Magnification.adjustPreferredSize(this, min, nat, true);
+    }
+
+    vfunc_get_preferred_height(forWidth) {
+        const [min, nat] = super.vfunc_get_preferred_height(forWidth);
+        return Magnification.adjustPreferredSize(this, min, nat, false);
     }
 
     // we override the method show taken from:
@@ -226,6 +238,12 @@ export const DockDash = GObject.registerClass({
         });
         this.updateShowAppsButton();
 
+        this._stacksContainer = new Stacks.DockStacksContainer(this, this._position);
+        this._dashContainer.add_child(this._stacksContainer);
+        // The stacks sit at the far end of the dock, so the show apps button
+        // has to be pinned to its edge again once they are in place.
+        this.updateShowAppsButton();
+
         this._background = new St.Widget({
             style_class: 'dash-background',
             y_expand: this._isHorizontal,
@@ -255,6 +273,7 @@ export const DockDash = GObject.registerClass({
         this._appSystem = Shell.AppSystem.get_default();
 
         this.iconAnimator = new Docking.IconAnimator(this);
+        this._magnifier = new Magnification.DockMagnifier(this);
 
         this._signalsHandler.add([
             this._appSystem,
@@ -321,6 +340,8 @@ export const DockDash = GObject.registerClass({
     }
 
     _onDestroy() {
+        this._magnifier?.destroy();
+        this._magnifier = null;
         this.iconAnimator.destroy();
 
         if (this._requiresVisibilityTimeout) {
@@ -336,15 +357,26 @@ export const DockDash = GObject.registerClass({
 
 
     _onItemDragBegin(...args) {
+        this._setMagnificationFrozen(true);
         return Dash.Dash.prototype._onItemDragBegin.call(this, ...args);
     }
 
     _onItemDragCancelled(...args) {
+        this._setMagnificationFrozen(false);
         return Dash.Dash.prototype._onItemDragCancelled.call(this, ...args);
     }
 
     _onItemDragEnd(...args) {
+        this._setMagnificationFrozen(false);
         return Dash.Dash.prototype._onItemDragEnd.call(this, ...args);
+    }
+
+    _setMagnificationFrozen(frozen) {
+        if (frozen === this._magnificationFrozen)
+            return;
+
+        this._magnificationFrozen = frozen;
+        this._magnifier?.setFrozen(frozen);
     }
 
     _endItemDrag(...args) {
@@ -459,6 +491,7 @@ export const DockDash = GObject.registerClass({
 
         // reset timeout to avid conflicts with the mousehover event
         this._ensureItemVisibility(null);
+        this._magnifier?.reset(false);
 
         // Skip to avoid double events mouse
         if (event.get_scroll_direction() !== Clutter.ScrollDirection.SMOOTH)
@@ -590,6 +623,61 @@ export const DockDash = GObject.registerClass({
     }
 
     /**
+     * Hook a newly created stack item into the dash: tooltip label, scroll
+     * into view, and menu state forwarding.
+     *
+     * @param {Clutter.Actor} stack the stack item
+     */
+    hookUpStackItem(stack) {
+        this._hookUpLabel(stack, stack);
+        stack.toggleButton.connect('notify::hover', a => this._ensureItemVisibility(a));
+        stack.connect('menu-state-changed', (_icon, opened) =>
+            this._itemMenuStateChanged(stack, opened));
+    }
+
+    /**
+     * Called by the stacks container whenever the set of stacks changed.
+     */
+    onStacksChanged() {
+        this.updateShowAppsButton();
+        this._stacksContainer?.setIconSize(this.iconSize);
+        this._magnifier?.refresh();
+        // The stacks container is built while the dash is still being
+        // constructed, before the deferred redisplay work exists.
+        if (this._workId)
+            this._queueRedisplay();
+    }
+
+    /**
+     * The dock items taking part in magnification, in visual order.
+     *
+     * @returns {Clutter.Actor[]} the magnifiable dash item containers
+     */
+    getMagnifiableItems() {
+        const boxItems = this._box.get_children().filter(actor =>
+            actor.child && actor.child._delegate &&
+            actor.child._delegate.icon && !actor.animatingOut);
+
+        const fromBoxContainer = () => this._boxContainer.get_children().flatMap(child => {
+            if (child === this._box)
+                return boxItems;
+            if (child === this._showAppsIcon && child.visible)
+                return [child];
+            return [];
+        });
+
+        return this._dashContainer.get_children().flatMap(child => {
+            if (child === this._scrollView)
+                return fromBoxContainer();
+            if (child === this._showAppsIcon && child.visible)
+                return [child];
+            if (child === this._stacksContainer && child.visible)
+                return this._stacksContainer.getStackItems();
+            return [];
+        });
+    }
+
+    /**
      * Return an array with the "proper" appIcons currently in the dash
      */
     getAppIcons() {
@@ -636,6 +724,8 @@ export const DockDash = GObject.registerClass({
         });
 
         iconChildren.push(this._showAppsIcon);
+        if (this._stacksContainer?.visible)
+            iconChildren.push(...this._stacksContainer.getStackItems());
 
         if (this._maxWidth === -1 && this._maxHeight === -1)
             return;
@@ -750,6 +840,8 @@ export const DockDash = GObject.registerClass({
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         }
+
+        this._stacksContainer?.setIconSize(this.iconSize);
     }
 
     _redisplay() {
@@ -815,6 +907,15 @@ export const DockDash = GObject.registerClass({
                 if (!showFavorites || !(app.get_id() in favorites))
                     newApps.push(app);
             });
+        }
+
+        if (settings.showRecentApplications) {
+            const limit = Math.max(0, settings.recentApplicationsLimit);
+            const recent = limit
+                ? Shell.AppUsage.get_default().get_most_used?.() ?? [] : [];
+            recent.filter(app => app && !newApps.includes(app) &&
+                app.get_app_info()?.should_show()).slice(0, limit)
+                .forEach(app => newApps.push(app));
         }
 
         this._signalsHandler.removeWithLabel(Labels.SHOW_MOUNTS);
@@ -982,6 +1083,8 @@ export const DockDash = GObject.registerClass({
         this._updateNumberOverlay();
 
         this.updateShowAppsButton();
+
+        this._magnifier?.refresh();
     }
 
     _updateNumberOverlay() {

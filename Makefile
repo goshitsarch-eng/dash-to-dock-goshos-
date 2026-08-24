@@ -19,7 +19,9 @@ EXTRA_MODULES = \
                 launcherAPI.js \
                 locations.js \
                 locationsWorker.js \
+                magnification.js \
                 notificationsMonitor.js \
+                stacks.js \
                 windowPreview.js \
                 intellihide.js \
                 prefs.js \
@@ -78,7 +80,7 @@ mergepo: potfile
 	done;
 
 ./po/dashtodock.pot: ./po/POTFILES.in
-	xgettext --keyword=__ --keyword=N__ --add-comments='Translators:' -o po/dashtodock.pot --package-name "Dash to Dock" --from-code=utf-8 --files-from=$<
+	xgettext --keyword=__ --keyword=N__ --add-comments='Translators:' -o po/dashtodock.pot --package-name "goshos-dock" --from-code=utf-8 --files-from=$<
 
 ./po/%.mo: ./po/%.po
 	msgfmt -c $< -o $@

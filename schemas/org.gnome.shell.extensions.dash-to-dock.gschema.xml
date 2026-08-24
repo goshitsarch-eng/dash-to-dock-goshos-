@@ -50,6 +50,21 @@
     <value value='8' nick='BINARY'/>
     <value value='9' nick='DOT'/>
   </enum>
+  <enum id='org.gnome.shell.extensions.dash-to-dock.stack-view'>
+    <value value='0' nick='AUTOMATIC'/>
+    <value value='1' nick='FAN'/>
+    <value value='2' nick='GRID'/>
+    <value value='3' nick='LIST'/>
+  </enum>
+  <enum id='org.gnome.shell.extensions.dash-to-dock.stack-sort'>
+    <value value='0' nick='NAME'/>
+    <value value='1' nick='DATE_MODIFIED'/>
+    <value value='2' nick='KIND'/>
+  </enum>
+  <enum id='org.gnome.shell.extensions.dash-to-dock.show-apps-button-action'>
+    <value value='0' nick='OVERVIEW'/>
+    <value value='1' nick='STACK'/>
+  </enum>
   <schema path="/org/gnome/shell/extensions/dash-to-dock/" id="org.gnome.shell.extensions.dash-to-dock">
     <key name="dock-position" enum="org.gnome.shell.extensions.dash-to-dock.position">
       <default>'BOTTOM'</default>
@@ -639,6 +654,111 @@
       <default>true</default>
       <summary>Wether the application-provioded counter via Unity API should override the notifications or be summed to it</summary>
       <description>If an application provides a counter through the Unity API, then such value will be used. Otherwise the counter will be summed with the unread notification numbers (if enabled)</description>
+    </key>
+    <key name="magnification-enabled" type="b">
+      <default>false</default>
+      <summary>Magnify dock icons on hover</summary>
+      <description>Enlarge the icon under the pointer, and its neighbours, like the macOS dock does. The dock reserves the extra room the magnified icons need, so its size never changes while the pointer moves over it.</description>
+    </key>
+    <key name="magnification-factor" type="d">
+      <default>1.5</default>
+      <range min="1.0" max="3.0"/>
+      <summary>Magnification level</summary>
+      <description>How much bigger the icon right under the pointer becomes.</description>
+    </key>
+    <key name="magnification-range" type="d">
+      <default>2.0</default>
+      <range min="1.0" max="6.0"/>
+      <summary>Magnification spread</summary>
+      <description>How many neighbouring icons are affected by the magnification.</description>
+    </key>
+    <key name="show-apps-button-action" enum="org.gnome.shell.extensions.dash-to-dock.show-apps-button-action">
+      <default>'OVERVIEW'</default>
+      <summary>What the Show Applications button does</summary>
+      <description>Either open the GNOME Shell applications overview, or pop up the list of installed applications as a stack over the dock.</description>
+    </key>
+    <key name="show-applications-stack" type="b">
+      <default>false</default>
+      <summary>Show an Applications stack in the dock</summary>
+      <description>Add a dock item that pops up the installed applications.</description>
+    </key>
+    <key name="show-documents-stack" type="b">
+      <default>false</default>
+      <summary>Show a Documents stack in the dock</summary>
+      <description>Add a dock item that pops up the contents of the Documents folder.</description>
+    </key>
+    <key name="show-downloads-stack" type="b">
+      <default>false</default>
+      <summary>Show a Downloads stack in the dock</summary>
+      <description>Add a dock item that pops up the contents of the Downloads folder.</description>
+    </key>
+    <key name="show-home-stack" type="b">
+      <default>false</default>
+      <summary>Show a Home stack in the dock</summary>
+      <description>Add a dock item that pops up the contents of the home folder.</description>
+    </key>
+    <key name="custom-stacks" type="as">
+      <default>[]</default>
+      <summary>Folders added to the dock as stacks</summary>
+      <description>Absolute paths or URIs, in dock order. A leading tilde is expanded to the home folder. Each folder gets its own dock item, named after the folder.</description>
+    </key>
+    <key name="stack-view" enum="org.gnome.shell.extensions.dash-to-dock.stack-view">
+      <default>'AUTOMATIC'</default>
+      <summary>How stack contents are displayed by default</summary>
+      <description>Automatic uses a fan for small folders and a grid otherwise, matching the macOS behaviour. Used by every stack that has no choice of its own.</description>
+    </key>
+    <key name="stack-sort" enum="org.gnome.shell.extensions.dash-to-dock.stack-sort">
+      <default>'NAME'</default>
+      <summary>How stack contents are sorted by default</summary>
+      <description>Sort the contents of a stack by name, by modification date or by kind. Used by every stack that has no choice of its own.</description>
+    </key>
+    <key name="stack-view-overrides" type="a{ss}">
+      <default>{}</default>
+      <summary>Per stack view, as picked from the right click menu</summary>
+      <description>Maps a stack to one of AUTOMATIC, FAN, GRID or LIST. Stacks that are not listed use the default view.</description>
+    </key>
+    <key name="stack-sort-overrides" type="a{ss}">
+      <default>{}</default>
+      <summary>Per stack sort order, as picked from the right click menu</summary>
+      <description>Maps a stack to one of NAME, DATE_MODIFIED or KIND. Stacks that are not listed use the default sort order.</description>
+    </key>
+    <key name="stack-max-items" type="i">
+      <default>40</default>
+      <range min="1" max="500"/>
+      <summary>Maximum number of entries shown in a folder stack</summary>
+      <description>Folders with more entries show the first ones and a note about the remaining items.</description>
+    </key>
+    <key name="show-stacks-separator" type="b">
+      <default>true</default>
+      <summary>Show a divider before the stacks</summary>
+      <description>Draw the macOS style divider that separates the applications from the stacks.</description>
+    </key>
+    <key name="show-recent-applications" type="b">
+      <default>false</default>
+      <summary>Show recently used applications in the dock</summary>
+      <description>Append the most recently used applications that are neither pinned nor running, like the macOS recent applications section.</description>
+    </key>
+    <key name="recent-applications-limit" type="i">
+      <default>3</default>
+      <range min="1" max="10"/>
+      <summary>How many recent applications to show</summary>
+      <description>The maximum number of recently used applications added to the dock.</description>
+    </key>
+    <key name="launch-bounce-animation" type="b">
+      <default>false</default>
+      <summary>Bounce the icon of a starting application</summary>
+      <description>Make the icon hop out of the dock while the application is starting up, like the macOS dock does.</description>
+    </key>
+    <key name="dim-hidden-applications" type="b">
+      <default>false</default>
+      <summary>Dim applications whose windows are all minimized</summary>
+      <description>Draw the icon of a hidden application translucent, like the macOS dock does.</description>
+    </key>
+    <key name="hidden-applications-opacity" type="d">
+      <default>0.55</default>
+      <range min="0.1" max="1.0"/>
+      <summary>Opacity of hidden application icons</summary>
+      <description>How translucent the icon of an application with only minimized windows is.</description>
     </key>
   </schema>
 </schemalist>

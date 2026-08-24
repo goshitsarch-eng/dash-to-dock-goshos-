@@ -30,6 +30,8 @@ import {
     DBusMenuUtils,
     Docking,
     Locations,
+    Magnification,
+    Stacks,
     Theming,
     Utils,
     WindowPreview,
@@ -48,7 +50,22 @@ const tracker = Shell.WindowTracker.get_default();
 const Labels = Object.freeze({
     ISOLATE_MONITORS: Symbol('isolate-monitors'),
     ISOLATE_WORKSPACES: Symbol('isolate-workspaces'),
+    MINIMIZED_WINDOWS: Symbol('minimized-windows'),
     URGENT_WINDOWS: Symbol('urgent-windows'),
+});
+
+// How far a starting application bounces out of the dock, as a fraction of
+// the icon size.
+const LAUNCH_BOUNCE_AMPLITUDE = 0.35;
+
+// How long the icon takes to fade in or out when an application is hidden.
+const DIM_HIDDEN_TIME = 150;
+
+// The descriptor the show apps button uses when it pops a stack up: it shares
+// the view and sort choices of a dedicated Applications stack.
+const APPLICATIONS_STACK = Object.freeze({
+    id: Stacks.StackKind.APPLICATIONS,
+    kind: Stacks.StackKind.APPLICATIONS,
 });
 
 const clickAction = Object.freeze({
@@ -208,6 +225,16 @@ export const DockAbstractAppIcon = GObject.registerClass({
         this._progressOverlayArea = null;
         this._progress = 0;
 
+        // Toggling the setting also has to start or stop tracking the
+        // minimized state of the windows, which _updateState() does.
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::dim-hidden-applications', () => this._updateState());
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::hidden-applications-opacity', () => this._updateHiddenState());
+
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::launch-bounce-animation', () => this._updateLaunchAnimation());
+
         [
             'apply-custom-theme',
             'running-indicator-style',
@@ -328,6 +355,14 @@ export const DockAbstractAppIcon = GObject.registerClass({
         this._updateRunningState();
         this._updateFocusState();
         this._updateUrgentWindows(interestingWindows);
+        this._updateHiddenState(interestingWindows);
+
+        this._signalsHandler.removeWithLabel(Labels.MINIMIZED_WINDOWS);
+        if (Docking.DockManager.settings.dimHiddenApplications) {
+            interestingWindows.forEach(window =>
+                this._signalsHandler.addWithLabel(Labels.MINIMIZED_WINDOWS,
+                    window, 'notify::minimized', () => this._updateHiddenState()));
+        }
 
         if (Docking.DockManager.settings.isolateWorkspaces) {
             this._signalsHandler.removeWithLabel(Labels.ISOLATE_WORKSPACES);
@@ -339,6 +374,82 @@ export const DockAbstractAppIcon = GObject.registerClass({
 
     _updateRunningState() {
         this.running = (this.app.state === Shell.AppState.RUNNING) && this.windowsCount;
+        this._updateLaunchAnimation();
+    }
+
+    /**
+     * Dim applications whose windows are all minimized, the way the macOS dock
+     * shows hidden applications.
+     *
+     * @param {Meta.Window[]} [interestingWindows] the windows to consider
+     */
+    _updateHiddenState(interestingWindows) {
+        const {settings} = Docking.DockManager;
+        const icon = this.icon?._iconBin;
+        if (!icon)
+            return;
+
+        let hidden = false;
+        if (settings.dimHiddenApplications) {
+            const windows = interestingWindows ?? this.getInterestingWindows();
+            hidden = !!windows.length && windows.every(w => w.minimized);
+        }
+
+        const opacity = hidden
+            ? Math.round(Utils.clampDouble(settings.hiddenApplicationsOpacity) * 255) : 255;
+
+        if (icon.opacity === opacity)
+            return;
+
+        icon.remove_transition('opacity');
+        icon.ease({
+            opacity,
+            duration: DIM_HIDDEN_TIME,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
+    }
+
+    /**
+     * Bounce the icon while the application is starting, like the macOS dock.
+     */
+    _updateLaunchAnimation() {
+        const icon = this.icon?._iconBin;
+        if (!icon || !this.iconAnimator)
+            return;
+
+        const {settings} = Docking.DockManager;
+        const wanted = settings.launchBounceAnimation &&
+            this.app.state === Shell.AppState.STARTING;
+
+        if (wanted === !!this._launchBouncing)
+            return;
+
+        this._launchBouncing = wanted;
+
+        if (wanted) {
+            const size = this.icon.iconSize || 48;
+            const amplitude = size * LAUNCH_BOUNCE_AMPLITUDE;
+            switch (Utils.getPosition()) {
+            case St.Side.TOP:
+                icon._dockBounce = {axis: 'translation_y', amplitude};
+                break;
+            case St.Side.LEFT:
+                icon._dockBounce = {axis: 'translation_x', amplitude};
+                break;
+            case St.Side.RIGHT:
+                icon._dockBounce = {axis: 'translation_x', amplitude: -amplitude};
+                break;
+            default:
+                icon._dockBounce = {axis: 'translation_y', amplitude: -amplitude};
+                break;
+            }
+            this.iconAnimator.addAnimation(icon, 'bounce');
+        } else {
+            this.iconAnimator.removeAnimation(icon, 'bounce');
+            icon.translation_x = 0;
+            icon.translation_y = 0;
+            delete icon._dockBounce;
+        }
     }
 
     _updateFocusState() {
@@ -1437,6 +1548,62 @@ export const DockShowAppsIcon = GObject.registerClass({
         this._menuTimeoutId = 0;
 
         this._maybeEnablePopupGestures();
+
+        this._signalsHandler = new Utils.GlobalSignalsHandler(this);
+        this._signalsHandler.add(Docking.DockManager.settings,
+            'changed::show-apps-button-action', () => this._updateShowAppsAction());
+        this.toggleButton.connect('clicked', () => {
+            if (this._usesStack())
+                this._toggleApplicationsStack();
+        });
+        this.connect('destroy', () => {
+            this._stackPopup?.destroy();
+            this._stackPopup = null;
+        });
+        this._updateShowAppsAction();
+    }
+
+    _usesStack() {
+        return Docking.DockManager.settings.showAppsButtonAction ===
+            Stacks.ShowAppsAction.STACK;
+    }
+
+    /**
+     * In stack mode the button must not behave like a toggle at all, so that
+     * nothing in the shell mistakes it for a request to enter the overview.
+     */
+    _updateShowAppsAction() {
+        const usesStack = this._usesStack();
+        this.toggleButton.toggle_mode = !usesStack;
+
+        if (!usesStack) {
+            this._stackPopup?.destroy();
+            this._stackPopup = null;
+            return;
+        }
+
+        this.toggleButton.checked = false;
+    }
+
+    _toggleApplicationsStack() {
+        this._removeMenuTimeout();
+
+        if (!this._stackPopup) {
+            this._stackPopup = new Stacks.StackPopupController(this,
+                APPLICATIONS_STACK, this._menuManager);
+        }
+
+        if (this._stackPopup.isOpen)
+            this._stackPopup.close();
+        else
+            this._stackPopup.popup().catch(e => logError(e));
+    }
+
+    onStackMenuStateChanged(isOpen) {
+        if (isOpen)
+            this.toggleButton.set_hover(true);
+
+        this.emit('menu-state-changed', isOpen);
     }
 
     _createIcon(size) {
@@ -1474,6 +1641,16 @@ export const DockShowAppsIcon = GObject.registerClass({
 
     showLabel(...args) {
         itemShowLabel.call(this, ...args);
+    }
+
+    vfunc_get_preferred_width(forHeight) {
+        const [min, nat] = super.vfunc_get_preferred_width(forHeight);
+        return Magnification.adjustPreferredSize(this, min, nat, true);
+    }
+
+    vfunc_get_preferred_height(forWidth) {
+        const [min, nat] = super.vfunc_get_preferred_height(forWidth);
+        return Magnification.adjustPreferredSize(this, min, nat, false);
     }
 
     setForcedHighlight(...args) {
@@ -1557,7 +1734,19 @@ class DockShowAppsIconMenu extends DockAppIconMenu {
     _rebuildMenu() {
         this.removeAll();
 
-        this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(__('Dash to Dock')));
+        this.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(__('goshos-dock')));
+
+        const {settings} = Docking.DockManager;
+        const useStack = settings.showAppsButtonAction === Stacks.ShowAppsAction.STACK;
+        const behaviour = this._appendMenuItem(useStack
+            ? __('Show applications in the overview') : __('Show applications as a stack'));
+        behaviour.connect('activate', () => settings.set_enum('show-apps-button-action',
+            useStack ? Stacks.ShowAppsAction.OVERVIEW : Stacks.ShowAppsAction.STACK));
+
+        if (useStack) {
+            Stacks.addStackViewItems(this, APPLICATIONS_STACK);
+            this._appendSeparator();
+        }
 
         const item = this._appendMenuItem(_('Settings'));
         item.connect('activate', () =>

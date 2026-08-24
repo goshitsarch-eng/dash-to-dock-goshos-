@@ -5,6 +5,7 @@ import GObject from 'gi://GObject';
 import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
+import Pango from 'gi://Pango';
 
 import {
     ExtensionPreferences,
@@ -1162,10 +1163,186 @@ const DockSettings = GObject.registerClass({
             this._builder.get_object('show_overview_on_startup_switch'),
             'active', Gio.SettingsBindFlags.INVERT_BOOLEAN);
 
+        this._bindMacOSSettings();
+
         // About Panel
 
         this._builder.get_object('extension_version').set_label(
             `${this._extensionPreferences.metadata.version}`);
+    }
+
+    /**
+     * The macOS page: magnification, stacks and the extra dock behaviours.
+     */
+    _bindMacOSSettings() {
+        const get = id => this._builder.get_object(id);
+
+        // Magnification
+        this._settings.bind('magnification-enabled', get('magnification_switch'),
+            'active', Gio.SettingsBindFlags.DEFAULT);
+
+        [
+            ['magnification_factor_scale', 'magnification-factor'],
+            ['magnification_range_scale', 'magnification-range'],
+            ['hidden_opacity_scale', 'hidden-applications-opacity'],
+        ].forEach(([id, key]) => {
+            const scale = get(id);
+            scale.set_value(this._settings.get_double(key));
+            scale.connect('value-changed',
+                widget => this._settings.set_double(key, widget.get_value()));
+        });
+
+        ['magnification_factor_scale', 'magnification_range_scale'].forEach(id =>
+            this._settings.bind('magnification-enabled', get(id), 'sensitive',
+                Gio.SettingsBindFlags.GET));
+
+        // Show Applications
+        const showAppsStackSwitch = get('show_apps_stack_switch');
+        const syncShowAppsAction = () => {
+            showAppsStackSwitch.set_active(
+                this._settings.get_enum('show-apps-button-action') === 1);
+        };
+        syncShowAppsAction();
+        showAppsStackSwitch.connect('notify::active', widget =>
+            this._settings.set_enum('show-apps-button-action',
+                widget.get_active() ? 1 : 0));
+        this._settings.connect('changed::show-apps-button-action', syncShowAppsAction);
+
+        // Stacks
+        [
+            ['applications_stack_switch', 'show-applications-stack'],
+            ['documents_stack_switch', 'show-documents-stack'],
+            ['downloads_stack_switch', 'show-downloads-stack'],
+            ['home_stack_switch', 'show-home-stack'],
+            ['stacks_separator_switch', 'show-stacks-separator'],
+            ['recent_applications_switch', 'show-recent-applications'],
+            ['launch_bounce_switch', 'launch-bounce-animation'],
+            ['dim_hidden_switch', 'dim-hidden-applications'],
+        ].forEach(([id, key]) =>
+            this._settings.bind(key, get(id), 'active', Gio.SettingsBindFlags.DEFAULT));
+
+        get('custom_stacks_add_button').connect('clicked',
+            () => this._chooseCustomStackFolder());
+        this._settings.connect('changed::custom-stacks',
+            () => this._updateCustomStacksList());
+        this._updateCustomStacksList();
+
+        get('stack_overrides_reset_button').connect('clicked', () => {
+            this._settings.reset('stack-view-overrides');
+            this._settings.reset('stack-sort-overrides');
+        });
+
+        [
+            ['stack_view_combo', 'stack-view'],
+            ['stack_sort_combo', 'stack-sort'],
+        ].forEach(([id, key]) => {
+            const combo = get(id);
+            const sync = () => combo.set_active(this._settings.get_enum(key));
+            sync();
+            combo.connect('changed', widget => {
+                const active = widget.get_active();
+                if (active >= 0)
+                    this._settings.set_enum(key, active);
+            });
+            this._settings.connect(`changed::${key}`, sync);
+        });
+
+        this._settings.bind('stack-max-items', get('stack_max_items_spinbutton'),
+            'value', Gio.SettingsBindFlags.DEFAULT);
+        this._settings.bind('recent-applications-limit',
+            get('recent_applications_spinbutton'), 'value', Gio.SettingsBindFlags.DEFAULT);
+
+        this._settings.bind('show-recent-applications',
+            get('recent_applications_spinbutton'), 'sensitive', Gio.SettingsBindFlags.GET);
+        this._settings.bind('dim-hidden-applications', get('hidden_opacity_scale'),
+            'sensitive', Gio.SettingsBindFlags.GET);
+    }
+
+    /**
+     * Rebuild the list of folders the user added to the dock. Each row shows
+     * the folder and a button that takes it back out again.
+     */
+    _updateCustomStacksList() {
+        const listBox = this._builder.get_object('custom_stacks_listbox');
+        let row = listBox.get_first_child();
+        while (row) {
+            const next = row.get_next_sibling();
+            listBox.remove(row);
+            row = next;
+        }
+
+        const folders = this._settings.get_strv('custom-stacks');
+        this._builder.get_object('custom_stacks_frame').set_visible(folders.length > 0);
+
+        folders.forEach((folder, index) => {
+            const grid = new Gtk.Grid({
+                margin_start: 12, margin_end: 12, margin_top: 6, margin_bottom: 6,
+                column_spacing: 12,
+            });
+            const label = new Gtk.Label({
+                label: folder,
+                hexpand: true,
+                halign: Gtk.Align.START,
+                ellipsize: Pango.EllipsizeMode.MIDDLE,
+            });
+            grid.attach(label, 0, 0, 1, 1);
+
+            const remove = new Gtk.Button({
+                icon_name: 'user-trash-symbolic',
+                valign: Gtk.Align.CENTER,
+                tooltip_text: __('Remove this folder from the dock'),
+            });
+            remove.connect('clicked', () => {
+                const kept = this._settings.get_strv('custom-stacks');
+                kept.splice(index, 1);
+                this._settings.set_strv('custom-stacks', kept);
+            });
+            grid.attach(remove, 1, 0, 1, 1);
+
+            listBox.append(new Gtk.ListBoxRow({child: grid, activatable: false}));
+        });
+    }
+
+    _chooseCustomStackFolder() {
+        const root = this.widget.get_root();
+        const title = __('Choose a folder');
+
+        const apply = folder => {
+            if (!folder)
+                return;
+
+            const path = folder.get_path() ?? folder.get_uri();
+            const folders = this._settings.get_strv('custom-stacks');
+            if (!folders.includes(path)) {
+                folders.push(path);
+                this._settings.set_strv('custom-stacks', folders);
+            }
+        };
+
+        if (Gtk.FileDialog) {
+            const dialog = new Gtk.FileDialog({title});
+            dialog.select_folder(root, null, (source, result) => {
+                try {
+                    apply(source.select_folder_finish(result));
+                } catch {
+                    // The user dismissed the dialog.
+                }
+            });
+            return;
+        }
+
+        const chooser = new Gtk.FileChooserNative({
+            title,
+            action: Gtk.FileChooserAction.SELECT_FOLDER,
+            transient_for: root,
+            modal: true,
+        });
+        chooser.connect('response', (dialog, response) => {
+            if (response === Gtk.ResponseType.ACCEPT)
+                apply(dialog.get_file());
+            dialog.destroy();
+        });
+        chooser.show();
     }
 });
 
