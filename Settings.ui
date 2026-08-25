@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Modified by Gosh OS contributors on 2026-08-24 for Goshos Dock preferences. -->
 <interface>
   <requires lib="gtk" version="4.0"/>
   <object class="GtkAdjustment" id="animation_time_adjustment">

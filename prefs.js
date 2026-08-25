@@ -1,4 +1,5 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
+// Modified by Gosh OS contributors on 2026-08-24 for Goshos Dock preferences.
 
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';

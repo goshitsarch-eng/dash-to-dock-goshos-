@@ -1,4 +1,5 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
+// Added by Gosh OS contributors on 2026-08-24 for Goshos Dock magnification.
 
 /**
  * macOS-like dock magnification.

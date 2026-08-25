@@ -1,3 +1,4 @@
+// Modified by Gosh OS contributors on 2026-08-24 for Goshos Dock modules.
 export * as AppIconIndicators from './appIconIndicators.js';
 export * as AppIcons from './appIcons.js';
 export * as AppIconsDecorator from './appIconsDecorator.js';

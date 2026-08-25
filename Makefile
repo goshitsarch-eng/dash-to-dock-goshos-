@@ -1,10 +1,12 @@
 # Basic Makefile
+# Modified by Gosh OS contributors on 2026-08-24 for the Goshos Dock fork.
 
 UUID = dash-to-dock@micxgx.gmail.com
 BASE_MODULES = extension.js \
                metadata.json \
                COPYING \
                README.md \
+               MODIFICATIONS.md \
                $(NULL)
 
 EXTRA_MODULES = \

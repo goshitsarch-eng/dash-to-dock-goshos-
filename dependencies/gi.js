@@ -1,3 +1,4 @@
+// Modified by Gosh OS contributors on 2026-08-24 for Goshos Dock dependencies.
 export {default as Atk} from 'gi://Atk';
 export {default as Clutter} from 'gi://Clutter';
 export {default as Cogl} from 'gi://Cogl';

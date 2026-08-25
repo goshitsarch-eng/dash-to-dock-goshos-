@@ -1,4 +1,7 @@
 # goshos-dock
+
+> Modified by Gosh OS contributors on 2026-08-24. See [MODIFICATIONS.md](MODIFICATIONS.md) for the fork's changes and provenance.
+
 ![screenshot](https://github.com/micheleg/dash-to-dock/raw/master/media/screenshot.jpg)
 
 ## A macOS-like dock for the GNOME Shell
