@@ -1,4 +1,5 @@
 {
+"x-gosh-modification-notice": "Modified by Gosh OS contributors on 2026-08-24; see MODIFICATIONS.md",
 "shell-version": [
     "45",
     "46",
@@ -12,7 +13,7 @@
 "name": "goshos-dock",
 "description": "goshos-dock is a macOS-like dock for the GNOME Shell. It moves the dash out of the overview and turns it into a dock for easier launching of applications and faster switching between windows and desktops, with optional icon magnification, Applications/Documents/Downloads/custom folder stacks and other macOS dock behaviours. Side and bottom placement options are available.",
 "original-author": "micxgx@gmail.com",
-"url": "https://micheleg.github.io/dash-to-dock/",
+"url": "https://github.com/goshitsarch-eng/dash-to-dock-goshos-",
 "gettext-domain": "dashtodock",
-"version": 106
+"version": 107
 }

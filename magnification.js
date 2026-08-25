@@ -1,4 +1,5 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
+// Added by Gosh OS contributors on 2026-08-24 for Goshos Dock magnification.
 
 /**
  * macOS-like dock magnification.
@@ -274,7 +275,7 @@ export class DockMagnifier {
         this._signalsHandler?.removeWithLabel(Labels.MAGNIFICATION);
 
         const dash = this._dash;
-        if (dash && !dash.is_finalized?.()) {
+        if (dash) {
             if (this._wasReactive !== undefined)
                 dash._dashContainer.reactive = this._wasReactive;
             this._restoreBackground();
@@ -355,14 +356,11 @@ export class DockMagnifier {
 
         delete item._dockMagnification;
 
-        if (item.is_finalized?.())
-            return;
-
         if (state.destroyId)
             item.disconnect(state.destroyId);
 
         const {child} = item;
-        if (!child || child.is_finalized?.())
+        if (!child)
             return;
 
         child.remove_transition('scale-x');
@@ -494,7 +492,10 @@ export class DockMagnifier {
 
     _updateForEvent(event) {
         const [stageX, stageY] = event.get_coords();
-        this._update(stageX, stageY, this._itemForActor(event.get_source()));
+        // Clutter only fills in the event source for crossing events, so the
+        // actor under the pointer has to come from the stage.
+        const target = global.stage.get_event_actor(event);
+        this._update(stageX, stageY, this._itemForActor(target));
     }
 
     _itemForActor(actor) {

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Modified by Gosh OS contributors on 2026-08-24 for Goshos Dock settings. -->
 <schemalist gettext-domain="gnome-shell-extensions">
   <enum id='org.gnome.shell.extensions.dash-to-dock.clickAction'>
     <value value='0' nick='skip'/>
