@@ -26,6 +26,7 @@ export class NotificationsMonitor {
         const getIsEnabled = () => !this.dndMode &&
             Docking.DockManager.settings.showIconsNotificationsCounter;
 
+        this._dndMode = !this._settings.get_boolean('show-banners');
         this._isEnabled = getIsEnabled();
         const checkIsEnabled = () => {
             const isEnabled = getIsEnabled();
@@ -37,9 +38,12 @@ export class NotificationsMonitor {
             }
         };
 
-        this._dndMode = !this._settings.get_boolean('show-banners');
         this._signalsHandler.add(this._settings, 'changed::show-banners', () => {
-            this._dndMode = !this._settings.get_boolean('show-banners');
+            const dndMode = !this._settings.get_boolean('show-banners');
+            if (dndMode !== this._dndMode) {
+                this._dndMode = dndMode;
+                this.emit('dnd-mode-changed');
+            }
             checkIsEnabled();
         });
         this._signalsHandler.add(Docking.DockManager.settings,
