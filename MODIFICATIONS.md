@@ -4,6 +4,7 @@
 
 - Initialize Do Not Disturb state before deriving notification-monitor enablement.
 - Emit and consume a dedicated Do Not Disturb change signal so application emblems and progress indicators refresh even when notification-counter enablement does not change.
+- Skip the old-Dash destroy signal hook in dummy-overview session modes where no overview Dash object exists.
 
 Goshos Dock is a modified version of [Dash to Dock](https://github.com/micheleg/dash-to-dock), distributed under GPL-2.0-or-later. The complete corresponding source is this repository.
 
