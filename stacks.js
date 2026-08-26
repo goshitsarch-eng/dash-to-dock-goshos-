@@ -101,6 +101,13 @@ const LIST_ROW_HEIGHT = 34;
 const TILE_ICON_SIZE = 48;
 const FAN_TILE_GAP = 6;
 const GRID_SPACING = 6;
+// Fallback tile width, in unscaled pixels: the width and the padding of
+// `.goshos-stack-tile`. Only used until the tiles have a theme node of their
+// own, from which the real width is measured.
+const TILE_WIDTH = 96 + 2 * 6;
+// Everything the grid shares its row with: the popup and grid paddings, the
+// scroll bar, the menu border and the gap kept to the screen edge.
+const GRID_CHROME_WIDTH = 96;
 
 const promisifiedPrototypes = new Set();
 
@@ -537,7 +544,6 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         this._signalsHandler = new Utils.GlobalSignalsHandler(this);
         this.blockSourceEvents = true;
 
-        this.actor.add_style_class_name('app-menu');
         this.actor.add_style_class_name('dock-app-menu');
         this.actor.add_style_class_name('goshos-stack-menu');
 
@@ -573,6 +579,17 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
                 ? StackView.FAN : StackView.GRID;
         }
 
+        // The shell caps `.app-menu` at 27.25em, which is narrower than a four
+        // column grid or than a fan rising sideways: those views size
+        // themselves, and the cap would simply clip their last column. Only
+        // the text views, whose rows are plain menu items, want it.
+        const tileView = !!entries.length &&
+            (view === StackView.FAN || view === StackView.GRID);
+        if (tileView)
+            this.actor.remove_style_class_name('app-menu');
+        else
+            this.actor.add_style_class_name('app-menu');
+
         if (!entries.length)
             this.addMenuItem(new PopupMenu.PopupMenuItem(__('Empty'), {reactive: false}));
         else if (view === StackView.LIST)
@@ -595,6 +612,11 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         return this._descriptor.kind === StackKind.APPLICATIONS;
     }
 
+    get _stackMonitor() {
+        return Main.layoutManager.findMonitorForActor(this.sourceActor) ??
+            Main.layoutManager.primaryMonitor;
+    }
+
     _activateEntry(entry) {
         this.close(BoxPointer.PopupAnimation.FULL);
         Main.overview.hide();
@@ -615,8 +637,7 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
      * @returns {number} how many rows fit on screen
      */
     _listCapacity() {
-        const monitor = Main.layoutManager.findMonitorForActor(this.sourceActor) ??
-            Main.layoutManager.primaryMonitor;
+        const monitor = this._stackMonitor;
         const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
         const rowHeight = LIST_ROW_HEIGHT * scaleFactor;
         return Math.max(5, Math.floor((monitor?.height ?? 720) * 0.7 / rowHeight));
@@ -645,18 +666,47 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         this._maybeAddOverflowNote(entries, shown);
     }
 
+    /**
+     * How many columns the grid gets: the square-ish macOS arrangement, but
+     * never more than the work area can hold. The grid cannot scroll
+     * sideways, so a column that does not fit is a column that is cut off.
+     *
+     * @param {StackTile[]} tiles the tiles to arrange
+     * @param {number} spacing the space between two columns
+     * @returns {number} the number of columns
+     */
+    _gridColumns(tiles, spacing) {
+        const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
+        // A tile only has a theme node once it is on the stage, and the theme
+        // may not be loaded yet even then, so keep the stylesheet width as a
+        // floor and only measure tiles that can answer.
+        const tileWidth = Math.max(TILE_WIDTH * scaleFactor,
+            ...tiles.filter(tile => tile.get_stage())
+                .map(tile => tile.get_preferred_width(-1)[1]));
+
+        const monitor = this._stackMonitor;
+        const workArea = monitor
+            ? Main.layoutManager.getWorkAreaForMonitor(monitor.index) : null;
+        const available = (workArea?.width ?? monitor?.width ?? 0) -
+            GRID_CHROME_WIDTH * scaleFactor;
+        const fitting = Math.floor((available + spacing) / (tileWidth + spacing));
+
+        return Utils.clamp(Math.ceil(Math.sqrt(tiles.length)), 1,
+            Math.max(1, Math.min(GRID_MAX_COLUMNS, fitting)));
+    }
+
     _buildGrid(entries) {
         const shown = this._limit(entries);
-        const columns = Math.max(1,
-            Math.min(GRID_MAX_COLUMNS, Math.ceil(Math.sqrt(shown.length))));
+        const tiles = shown.map(entry => {
+            const tile = new StackTile(entry);
+            tile.connect('clicked', () => this._activateEntry(entry));
+            return tile;
+        });
 
         const layout = new Clutter.GridLayout({
             orientation: Clutter.Orientation.HORIZONTAL,
             column_homogeneous: true,
             row_homogeneous: true,
-            // St does not map CSS spacing onto a Clutter.GridLayout.
-            column_spacing: GRID_SPACING,
-            row_spacing: GRID_SPACING,
         });
         // St.ScrollView only accepts a child implementing StScrollable, which
         // a plain St.Widget does not: St.Viewport is the scrollable container
@@ -667,10 +717,31 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
             x_expand: true,
         });
 
-        shown.forEach((entry, index) => {
-            const tile = new StackTile(entry);
-            tile.connect('clicked', () => this._activateEntry(entry));
-            layout.attach(tile, index % columns, Math.floor(index / columns), 1, 1);
+        let columns = 0;
+        const arrange = () => {
+            // St does not map CSS spacing onto a Clutter.GridLayout, so it is
+            // scaled here the way the stylesheet lengths are.
+            const {scaleFactor} = St.ThemeContext.get_for_stage(global.stage);
+            const spacing = Math.round(GRID_SPACING * scaleFactor);
+            layout.column_spacing = spacing;
+            layout.row_spacing = spacing;
+
+            const wanted = this._gridColumns(tiles, spacing);
+            if (wanted === columns)
+                return;
+
+            columns = wanted;
+            grid.remove_all_children();
+            tiles.forEach((tile, index) => layout.attach(tile,
+                index % columns, Math.floor(index / columns), 1, 1));
+        };
+
+        // The real tile width is only known once the tiles have a theme node,
+        // so lay the grid out again from the actual metrics when it maps.
+        arrange();
+        grid.connect('notify::mapped', () => {
+            if (grid.mapped)
+                arrange();
         });
 
         const scrollView = new St.ScrollView({
@@ -682,8 +753,7 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         });
         Utils.addActor(scrollView, grid);
 
-        const monitor = Main.layoutManager.findMonitorForActor(this.sourceActor) ??
-            Main.layoutManager.primaryMonitor;
+        const monitor = this._stackMonitor;
         if (monitor)
             scrollView.set_style(`max-height: ${Math.round(monitor.height * 0.6)}px;`);
 
@@ -691,6 +761,21 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         this._extraActors.push(scrollView);
 
         this._maybeAddOverflowNote(entries, shown);
+    }
+
+    /**
+     * How long the arc may grow before it runs out of screen. The fan is
+     * positioned by hand, so nothing else would keep it in the work area.
+     *
+     * @param {boolean} horizontal whether the dock is horizontal
+     * @returns {number} the room the arc has along its main axis
+     */
+    _fanLimit(horizontal) {
+        const monitor = this._stackMonitor;
+        const workArea = monitor
+            ? Main.layoutManager.getWorkAreaForMonitor(monitor.index) : null;
+        const room = horizontal ? workArea?.height : workArea?.width;
+        return Math.round((room ?? 0) * 0.9);
     }
 
     _buildFan(entries) {
@@ -712,10 +797,12 @@ const DockStackMenu = class DockStackMenu extends PopupMenu.PopupMenu {
         // Fixed positioning needs the natural tile size, which is only known
         // once the actors have a theme node; re-run it when the popup maps so
         // a first-time style load cannot leave the fan collapsed.
-        layOutFan(fan, tiles, position, horizontal);
+        const layOut = () =>
+            layOutFan(fan, tiles, position, horizontal, this._fanLimit(horizontal));
+        layOut();
         fan.connect('notify::mapped', () => {
             if (fan.mapped)
-                layOutFan(fan, tiles, position, horizontal);
+                layOut();
         });
 
         this._maybeAddOverflowNote(entries, shown);
@@ -905,8 +992,9 @@ function openUri(uri) {
  * @param {St.Button[]} tiles the tiles to lay out
  * @param {St.Side} position the dock position
  * @param {boolean} horizontal whether the dock is horizontal
+ * @param {number} mainLimit the room the arc has along its main axis
  */
-function layOutFan(fan, tiles, position, horizontal) {
+function layOutFan(fan, tiles, position, horizontal, mainLimit = 0) {
     if (!tiles.length)
         return;
 
@@ -918,10 +1006,18 @@ function layOutFan(fan, tiles, position, horizontal) {
         tileHeight = Math.max(tileHeight, height);
     });
 
-    const stepMain = (horizontal ? tileHeight : tileWidth) + FAN_TILE_GAP;
-    const lateralSpread = Math.round((horizontal ? tileWidth : tileHeight) * 0.45);
     const count = tiles.length;
-    const mainSize = count * stepMain;
+    const tileMain = horizontal ? tileHeight : tileWidth;
+    let stepMain = tileMain + FAN_TILE_GAP;
+    let mainSize = (count - 1) * stepMain + tileMain;
+
+    // Rather than run off the screen, the entries start to overlap.
+    if (mainLimit > 0 && mainSize > mainLimit && count > 1) {
+        stepMain = Math.max(0, (mainLimit - tileMain) / (count - 1));
+        mainSize = (count - 1) * stepMain + tileMain;
+    }
+
+    const lateralSpread = Math.round((horizontal ? tileWidth : tileHeight) * 0.45);
     const lateralSize = (horizontal ? tileWidth : tileHeight) + lateralSpread;
 
     tiles.forEach((tile, index) => {
@@ -929,7 +1025,7 @@ function layOutFan(fan, tiles, position, horizontal) {
         const lateral = Math.round(lateralSpread * Math.sin(progress * Math.PI / 2));
         // The first entry stays closest to the dock.
         const mainOffset = position === St.Side.BOTTOM || position === St.Side.RIGHT
-            ? mainSize - (index + 1) * stepMain : index * stepMain;
+            ? mainSize - tileMain - index * stepMain : index * stepMain;
 
         tile.set_size(tileWidth, tileHeight);
         if (horizontal)

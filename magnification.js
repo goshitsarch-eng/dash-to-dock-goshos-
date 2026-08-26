@@ -12,11 +12,17 @@
  * amount so that neighbours spread apart the way they do on macOS.
  *
  * On the *cross axis* every item reserves a constant slot big enough for the
- * largest possible magnified icon. That keeps the dock allocation stable while
- * magnifying: the dock never resizes under the pointer, so struts, the
- * intellihide target box and the desktop-icons usable area are never
+ * largest possible magnified icon. That keeps the dash allocation stable while
+ * magnifying: the dash never resizes under the pointer, so nothing is
  * recomputed mid-animation. The dock background is shrunk back to the resting
  * icon size so that only the icons themselves grow into the reserved space.
+ *
+ * The reserved head room — the difference between that slot and the resting
+ * size — is handed to `docking.js`, which allocates it *outside* the dock
+ * actor, over the screen rather than over the dock. The magnified icons rise
+ * above the dock strip like they do on macOS, while the struts, the
+ * intellihide target box and the desktop-icons usable area keep matching the
+ * strip the user actually sees.
  */
 
 import {
@@ -148,6 +154,20 @@ export class DockMagnifier {
 
     get enabled() {
         return this._enabled;
+    }
+
+    /**
+     * The room reserved on the cross axis for the magnified icons, on top of
+     * the size the dock items rest at.
+     *
+     * @returns {number} the reserved head room, in pixels
+     */
+    get headRoom() {
+        if (!this._enabled)
+            return 0;
+
+        const {crossBase, crossSlot} = this._shared;
+        return Math.max(0, crossSlot - crossBase);
     }
 
     /**
@@ -423,8 +443,8 @@ export class DockMagnifier {
         if (!background || !this._enabled)
             return;
 
-        const {crossBase, crossSlot, horizontal} = this._shared;
-        const headRoom = Math.max(0, crossSlot - crossBase);
+        const {horizontal} = this._shared;
+        const {headRoom} = this;
         if (!headRoom)
             return;
 

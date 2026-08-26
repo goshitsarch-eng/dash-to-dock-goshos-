@@ -340,6 +340,17 @@ export const DockDash = GObject.registerClass({
         return this._dashContainer;
     }
 
+    /**
+     * The room the magnifier reserves on the cross axis for the icons to grow
+     * into. The dock allocates it outside its own actor, so that reserving it
+     * does not eat into the work area.
+     *
+     * @returns {number} the reserved head room, in pixels
+     */
+    get magnificationHeadRoom() {
+        return this._magnifier?.headRoom ?? 0;
+    }
+
     _onDestroy() {
         this._magnifier?.destroy();
         this._magnifier = null;
