@@ -1,5 +1,11 @@
 # Goshos Dock modifications
 
+## 2026-08-26
+
+- Stop the stack popup from inheriting the shell app-menu maximum width for the grid and fan views, which clipped every column past the third.
+- Size the stack grid from the tile width the theme really gives, scale its spacing on HiDPI, and keep the number of columns within the work area.
+- Keep the fan arc inside the work area, overlapping its entries instead of running off the screen.
+
 ## 2026-08-25
 
 - Initialize Do Not Disturb state before deriving notification-monitor enablement.
