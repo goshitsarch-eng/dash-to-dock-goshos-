@@ -5,6 +5,7 @@
 - Stop the stack popup from inheriting the shell app-menu maximum width for the grid and fan views, which clipped every column past the third.
 - Size the stack grid from the tile width the theme really gives, scale its spacing on HiDPI, and keep the number of columns within the work area.
 - Keep the fan arc inside the work area, overlapping its entries instead of running off the screen.
+- Allocate the magnification head room outside the dock actor, so that turning icon zoom on no longer widens the struts, the intellihide box and the desktop icons area with an empty gap between the dock and the windows.
 
 ## 2026-08-25
 

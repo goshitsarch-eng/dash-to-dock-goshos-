@@ -24,7 +24,7 @@ It is a fork of [Dash to Dock](https://github.com/micheleg/dash-to-dock) that ad
 | **Launch bounce** — the icon of a starting application hops out of the dock | *Bounce the icon of a starting application* |
 | **Dim hidden applications** — applications whose windows are all minimized are drawn translucent | *Dim applications whose windows are all minimized* |
 
-Magnification reserves the room the magnified icons need up front, so the dock allocation — and therefore the work area, the intellihide box and the desktop icons area — never changes while the pointer moves across the dock.
+Magnification reserves the room the magnified icons need up front, so the dash never resizes while the pointer moves across the dock. That room is kept out of the dock itself: the work area, the intellihide box and the desktop icons area all match the dock strip you actually see, and the magnified icons rise over the windows the way they do on macOS.
 
 ## Installation from source
 

@@ -109,8 +109,12 @@ const DashSlideContainer = GObject.registerClass({
     },
 }, class DashSlideContainer extends St.Bin {
     _init(params = {}) {
-        super._init(params);
+        const {dash, ...properties} = params;
+        super._init(properties);
 
+        // The dash is the one reserving the magnification head room, and this
+        // container is what keeps that room out of the dock allocation.
+        this.dash = dash ?? null;
         this._slideoutSize = 0; // minimum size when slided out
         this.connect('notify::slide-x', () => this.queue_relayout());
 
@@ -119,6 +123,18 @@ const DashSlideContainer = GObject.registerClass({
             this._signalsHandler.add(Main.panel, 'notify::height',
                 () => this.queue_relayout());
         }
+    }
+
+    /**
+     * The room the magnifier reserves on the cross axis for the icons to grow
+     * into. It is drawn past the edge of this container, over the screen
+     * rather than over the dock, so that reserving it does not move the dock
+     * away from the windows.
+     *
+     * @returns {number} the reserved head room, in pixels
+     */
+    get _magnificationHeadRoom() {
+        return this.dash?.magnificationHeadRoom ?? 0;
     }
 
     vfunc_allocate(box) {
@@ -137,19 +153,28 @@ const DashSlideContainer = GObject.registerClass({
         const childWidth = natChildWidth;
         const childHeight = natChildHeight;
 
+        // The head room is at the end of the child that faces away from the
+        // screen edge: the dock is only as big as what is left of it.
+        const isHorizontal = (this.side === St.Side.TOP) || (this.side === St.Side.BOTTOM);
+        const headRoom = this._magnificationHeadRoom;
+        const dockWidth = childWidth - (isHorizontal ? 0 : headRoom);
+        const dockHeight = childHeight - (isHorizontal ? headRoom : 0);
+
         const childBox = new Clutter.ActorBox();
 
         const slideoutSize = this._slideoutSize;
 
         if (this.side === St.Side.LEFT) {
-            childBox.x1 = (this.slideX - 1) * (childWidth - slideoutSize);
-            childBox.x2 = slideoutSize + this.slideX * (childWidth - slideoutSize);
+            childBox.x1 = (this.slideX - 1) * (dockWidth - slideoutSize);
+            childBox.x2 = childBox.x1 + childWidth;
             childBox.y1 = 0;
             childBox.y2 = childBox.y1 + childHeight;
         } else if ((this.side === St.Side.RIGHT) || (this.side === St.Side.BOTTOM)) {
-            childBox.x1 = 0;
-            childBox.x2 = childWidth;
-            childBox.y1 = 0;
+            // Both grow away from the screen edge, so the head room comes
+            // first and the dock strip stays glued to this container.
+            childBox.x1 = this.side === St.Side.RIGHT ? -headRoom : 0;
+            childBox.x2 = childBox.x1 + childWidth;
+            childBox.y1 = this.side === St.Side.BOTTOM ? -headRoom : 0;
             childBox.y2 = childBox.y1 + childHeight;
         } else if (this.side === St.Side.TOP) {
             const monitor = Main.layoutManager.monitors[this.monitorIndex];
@@ -158,16 +183,21 @@ const DashSlideContainer = GObject.registerClass({
                 DockManager.settings.dockFixed)
                 yOffset = Main.panel.height;
             childBox.x1 = 0;
-            childBox.x2 = childWidth;
-            childBox.y1 = (this.slideX - 1) * (childHeight - slideoutSize) + yOffset;
-            childBox.y2 = slideoutSize + this.slideX * (childHeight - slideoutSize) + yOffset;
+            childBox.x2 = childBox.x1 + childWidth;
+            childBox.y1 = (this.slideX - 1) * (dockHeight - slideoutSize) + yOffset;
+            childBox.y2 = childBox.y1 + childHeight;
             availHeight += yOffset;
         }
 
         this.child.allocate(childBox);
 
-        this.child.set_clip(-childBox.x1, -childBox.y1,
-            -childBox.x1 + availWidth, -childBox.y1 + availHeight);
+        // Clip to what is allocated, plus the head room the magnified icons
+        // rise into on the way to the middle of the screen.
+        this.child.set_clip(
+            -childBox.x1 - (this.side === St.Side.RIGHT ? headRoom : 0),
+            -childBox.y1 - (this.side === St.Side.BOTTOM ? headRoom : 0),
+            -childBox.x1 + availWidth + (this.side === St.Side.LEFT ? headRoom : 0),
+            -childBox.y1 + availHeight + (this.side === St.Side.TOP ? headRoom : 0));
     }
 
     /**
@@ -178,6 +208,9 @@ const DashSlideContainer = GObject.registerClass({
     vfunc_get_preferred_width(forHeight) {
         let [minWidth, natWidth] = super.vfunc_get_preferred_width(forHeight || 0);
         if ((this.side ===  St.Side.LEFT) || (this.side === St.Side.RIGHT)) {
+            const headRoom = this._magnificationHeadRoom;
+            minWidth = Math.max(0, minWidth - headRoom);
+            natWidth = Math.max(0, natWidth - headRoom);
             minWidth = (minWidth - this._slideoutSize) * this.slideX + this._slideoutSize;
             natWidth = (natWidth - this._slideoutSize) * this.slideX + this._slideoutSize;
         }
@@ -192,6 +225,9 @@ const DashSlideContainer = GObject.registerClass({
     vfunc_get_preferred_height(forWidth) {
         let [minHeight, natHeight] = super.vfunc_get_preferred_height(forWidth || 0);
         if ((this.side ===  St.Side.TOP) || (this.side ===  St.Side.BOTTOM)) {
+            const headRoom = this._magnificationHeadRoom;
+            minHeight = Math.max(0, minHeight - headRoom);
+            natHeight = Math.max(0, natHeight - headRoom);
             minHeight = (minHeight - this._slideoutSize) * this.slideX + this._slideoutSize;
             natHeight = (natHeight - this._slideoutSize) * this.slideX + this._slideoutSize;
 
@@ -287,6 +323,7 @@ const DockedDash = GObject.registerClass({
         // centering, turn on track hover
         // This is the sliding actor whose allocation is to be tracked for input regions
         this._slider = new DashSlideContainer({
+            dash: this.dash,
             monitor_index: this._monitor.index,
             side: this._position,
             slide_x: Main.layoutManager._startingUp ? 0 : 1,
@@ -1256,27 +1293,43 @@ const DockedDash = GObject.registerClass({
         }
     }
 
+    /**
+     * The size of the dock strip as it is drawn: the dash box without the
+     * transparent head room the magnified icons rise into.
+     *
+     * @returns {number[]} the visible `[width, height]` pair
+     */
+    get _visibleBoxSize() {
+        const headRoom = this.dash?.magnificationHeadRoom ?? 0;
+        return [
+            Math.max(0, this._box.width - (this._isHorizontal ? 0 : headRoom)),
+            Math.max(0, this._box.height - (this._isHorizontal ? headRoom : 0)),
+        ];
+    }
+
     _updateVisibleDesktop() {
         if (!this._intellihideIsEnabled)
             return;
 
+        const [width, height] = this._visibleBoxSize;
         const {desktopIconsUsableArea} = DockManager.getDefault();
         if (this._position === St.Side.BOTTOM)
-            desktopIconsUsableArea.setMargins(this.monitorIndex, 0, this._box.height, 0, 0);
+            desktopIconsUsableArea.setMargins(this.monitorIndex, 0, height, 0, 0);
         else if (this._position === St.Side.TOP)
-            desktopIconsUsableArea.setMargins(this.monitorIndex, this._box.height, 0, 0, 0);
+            desktopIconsUsableArea.setMargins(this.monitorIndex, height, 0, 0, 0);
         else if (this._position === St.Side.RIGHT)
-            desktopIconsUsableArea.setMargins(this.monitorIndex, 0, 0, 0, this._box.width);
+            desktopIconsUsableArea.setMargins(this.monitorIndex, 0, 0, 0, width);
         else if (this._position === St.Side.LEFT)
-            desktopIconsUsableArea.setMargins(this.monitorIndex, 0, 0, this._box.width, 0);
+            desktopIconsUsableArea.setMargins(this.monitorIndex, 0, 0, width, 0);
     }
 
     _updateStaticBox() {
+        const [width, height] = this._visibleBoxSize;
         this._staticBox.init_rect(
-            this.x + this._slider.x - (this._position === St.Side.RIGHT ? this._box.width : 0),
-            this.y + this._slider.y - (this._position === St.Side.BOTTOM ? this._box.height : 0),
-            this._box.width,
-            this._box.height
+            this.x + this._slider.x - (this._position === St.Side.RIGHT ? width : 0),
+            this.y + this._slider.y - (this._position === St.Side.BOTTOM ? height : 0),
+            width,
+            height
         );
 
         this._intellihide.updateTargetBox(this._staticBox);
