@@ -37,15 +37,20 @@ jobs:
       - name: Generate translations
         run: make potfile
 
-      - name: Build release archive
-        run: make zip-file VERSION=109
-
-      - name: Verify release archive
-        run: unzip -t dash-to-dock@micxgx.gmail.com_v109.zip
+      - name: Build and verify release archive
+        id: package
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import json; print(json.load(open("metadata.json", encoding="utf-8"))["version"])')
+          [[ "$version" =~ ^[0-9]+$ ]]
+          archive="dash-to-dock@micxgx.gmail.com_v${version}.zip"
+          make zip-file VERSION="$version"
+          unzip -t "$archive"
+          printf 'version=%s\narchive=%s\n' "$version" "$archive" >> "$GITHUB_OUTPUT"
 
       - name: Upload release archive
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: goshos-dock-v109
-          path: dash-to-dock@micxgx.gmail.com_v109.zip
+          name: goshos-dock-v${{ steps.package.outputs.version }}
+          path: ${{ steps.package.outputs.archive }}
           if-no-files-found: error
