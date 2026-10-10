@@ -1,0 +1,8 @@
+{
+    "KPlugin": {
+        "Name": "Gosho's Dock visibility",
+        "Description": "Per-dock visibility and edge pressure for registered Gosho's Dock panels",
+        "EnabledByDefault": true,
+        "License": "GPL-2.0-or-later"
+    }
+}

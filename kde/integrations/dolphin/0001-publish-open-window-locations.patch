@@ -1,0 +1,171 @@
+diff --git a/src/dbusinterface.cpp b/src/dbusinterface.cpp
+index 1854449..65437cc 100644
+--- a/src/dbusinterface.cpp
++++ b/src/dbusinterface.cpp
+@@ -7,16 +7,30 @@
+ #include "dbusinterface.h"
+ #include "dolphin_generalsettings.h"
+ #include "global.h"
++#include "dolphinmainwindow.h"
+ 
+ #include <KPropertiesDialog>
+ #include <KWindowSystem>
+ 
++#include <QApplication>
++#include <QDBusMessage>
++#include <QDBusMetaType>
++#include <QTimer>
+ #include <QDBusConnection>
+ #include <QDBusConnectionInterface>
+ 
+ DBusInterface::DBusInterface()
+     : QObject()
+ {
++    qDBusRegisterMetaType<DolphinWindowLocations>();
++    for (auto *widget : QApplication::topLevelWidgets()) {
++        if (auto *window = qobject_cast<DolphinMainWindow *>(widget)) {
++            connect(window, &DolphinMainWindow::openLocationsChanged, this, [this] {
++                QTimer::singleShot(0, this, [this] { notifyOpenLocationsChanged(); });
++            });
++        }
++    }
++    m_lastLocations = openWindowsWithLocations();
+     QDBusConnection::sessionBus().registerObject(QStringLiteral("/org/freedesktop/FileManager1"),
+                                                  this,
+                                                  QDBusConnection::ExportScriptableContents | QDBusConnection::ExportAdaptors);
+@@ -26,6 +40,39 @@ DBusInterface::DBusInterface()
+     }
+ }
+ 
++DolphinWindowLocations DBusInterface::openWindowsWithLocations() const
++{
++    DolphinWindowLocations windows;
++    for (auto *widget : QApplication::topLevelWidgets()) {
++        if (auto *window = qobject_cast<DolphinMainWindow *>(widget)) {
++            // Wayland intentionally has no globally meaningful client-side winId().
++            // Dolphin owns one main window per process; clients authenticate this PID
++            // against the unique D-Bus owner and refuse ambiguous task matches.
++            const QString identity = KWindowSystem::isPlatformX11()
++                ? QStringLiteral("x11:%1").arg(window->winId())
++                : QStringLiteral("pid:%1").arg(QCoreApplication::applicationPid());
++            windows.insert(identity, window->openLocations());
++        }
++    }
++    return windows;
++}
++
++void DBusInterface::notifyOpenLocationsChanged()
++{
++    const auto locations = openWindowsWithLocations();
++    if (locations == m_lastLocations) {
++        return;
++    }
++    m_lastLocations = locations;
++    auto message = QDBusMessage::createSignal(QStringLiteral("/org/freedesktop/FileManager1"),
++                                            QStringLiteral("org.freedesktop.DBus.Properties"),
++                                            QStringLiteral("PropertiesChanged"));
++    message.setArguments({QStringLiteral("org.freedesktop.FileManager1"),
++                          QVariantMap{{QStringLiteral("OpenWindowsWithLocations"), QVariant::fromValue(locations)}},
++                          QStringList{}});
++    QDBusConnection::sessionBus().send(message);
++}
++
+ void DBusInterface::ShowFolders(const QStringList &uriList, const QString &startUpId)
+ {
+     const QList<QUrl> urls = Dolphin::validateUris(uriList);
+diff --git a/src/dbusinterface.h b/src/dbusinterface.h
+index fc465cb..f4878d9 100644
+--- a/src/dbusinterface.h
++++ b/src/dbusinterface.h
+@@ -8,14 +8,20 @@
+ #define DBUSINTERFACE_H
+ 
+ #include <QObject>
++#include <QMap>
++#include <QStringList>
++
++using DolphinWindowLocations = QMap<QString, QStringList>;
+ 
+ class DBusInterface : QObject
+ {
+     Q_OBJECT
+     Q_CLASSINFO("D-Bus Interface", "org.freedesktop.FileManager1")
++    Q_PROPERTY(DolphinWindowLocations OpenWindowsWithLocations READ openWindowsWithLocations)
+ 
+ public:
+     DBusInterface();
++    DolphinWindowLocations openWindowsWithLocations() const;
+     Q_SCRIPTABLE void ShowFolders(const QStringList &uriList, const QString &startUpId);
+     Q_SCRIPTABLE void ShowItems(const QStringList &uriList, const QString &startUpId);
+     Q_SCRIPTABLE void ShowItemProperties(const QStringList &uriList, const QString &startUpId);
+@@ -33,6 +39,8 @@ public:
+     bool isDaemon() const;
+ 
+ private:
++    void notifyOpenLocationsChanged();
++    DolphinWindowLocations m_lastLocations;
+     bool m_isDaemon = false;
+ };
+ 
+diff --git a/src/dolphinmainwindow.cpp b/src/dolphinmainwindow.cpp
+index ab48a52..57d826f 100644
+--- a/src/dolphinmainwindow.cpp
++++ b/src/dolphinmainwindow.cpp
+@@ -174,6 +174,9 @@ DolphinMainWindow::DolphinMainWindow()
+     actionCollection()->addAction(QStringLiteral("url_navigators"), navigatorsWidgetAction);
+     m_tabWidget = new DolphinTabWidget(navigatorsWidgetAction, this);
+     m_tabWidget->setObjectName("tabWidget");
++    connect(m_tabWidget, &DolphinTabWidget::urlChanged, this, &DolphinMainWindow::openLocationsChanged);
++    connect(m_tabWidget, &DolphinTabWidget::tabCountChanged, this, &DolphinMainWindow::openLocationsChanged);
++    connect(m_tabWidget, &DolphinTabWidget::activeViewChanged, this, &DolphinMainWindow::openLocationsChanged);
+     connect(m_tabWidget, &DolphinTabWidget::activeViewChanged, this, &DolphinMainWindow::activeViewChanged);
+     connect(m_tabWidget, &DolphinTabWidget::tabCountChanged, this, &DolphinMainWindow::tabCountChanged);
+     connect(m_tabWidget, &DolphinTabWidget::currentUrlChanged, this, &DolphinMainWindow::updateWindowTitle);
+@@ -3231,6 +3234,23 @@ void DolphinMainWindow::UndoUiInterface::jobError(KIO::Job *job)
+     }
+ }
+ 
++QStringList DolphinMainWindow::openLocations() const
++{
++    QStringList locations;
++    for (int i = 0; i < m_tabWidget->count(); ++i) {
++        const auto *tab = m_tabWidget->tabPageAt(i);
++        if (!tab) {
++            continue;
++        }
++        locations.append(tab->primaryViewContainer()->url().toString(QUrl::FullyEncoded | QUrl::RemovePassword));
++        if (tab->splitViewEnabled() && tab->secondaryViewContainer()) {
++            locations.append(tab->secondaryViewContainer()->url().toString(QUrl::FullyEncoded | QUrl::RemovePassword));
++        }
++    }
++    locations.removeDuplicates();
++    return locations;
++}
++
+ bool DolphinMainWindow::isUrlOpen(const QString &url)
+ {
+     return m_tabWidget->isUrlOpen(QUrl::fromUserInput(url));
+diff --git a/src/dolphinmainwindow.h b/src/dolphinmainwindow.h
+index 385582c..38d0e56 100644
+--- a/src/dolphinmainwindow.h
++++ b/src/dolphinmainwindow.h
+@@ -135,6 +135,9 @@ public:
+      */
+     void setSessionAutoSaveEnabled(bool enable);
+ 
++    /** All tab and split-view directory URLs, without embedded passwords. */
++    QStringList openLocations() const;
++
+     bool isFoldersPanelEnabled() const;
+     bool isInformationPanelEnabled() const;
+     bool isSplitViewEnabledInCurrentTab() const;
+@@ -233,6 +236,9 @@ public Q_SLOTS:
+     void slotTabBarChanged();
+ 
+ Q_SIGNALS:
++    /** A tab, split view or directory location changed. */
++    void openLocationsChanged();
++
+     /**
+      * Is sent if the selection of the currently active view has
+      * been changed.

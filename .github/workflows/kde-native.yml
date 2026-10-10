@@ -1,0 +1,26 @@
+name: KDE native build
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux@sha256:4e77cf2ea5f410e6f8be5abf93ccf17ce2436e87a138c167208356711a405dbd
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install signed stable KDE SDK packages
+        run: bash kde/tools/install-sdk-packages.sh
+      - name: Configure and build native applet and compositor integration
+        run: |
+          cmake -S kde -B kde/build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=ON
+          cmake --build kde/build --parallel 2
+      - name: Run native backend and QML tests
+        run: ctest --test-dir kde/build --output-on-failure --timeout 120
+      - name: Load the compiled dock and exercise real Wayland windows
+        run: |
+          cmake --install kde/build
+          chown -R kde-test:kde-test kde/build
+          runuser -u kde-test -- bash kde/tools/test-wayland.sh "$PWD/kde/build"

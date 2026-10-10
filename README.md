@@ -26,6 +26,16 @@ It is a fork of [Dash to Dock](https://github.com/micheleg/dash-to-dock) that ad
 
 Magnification reserves the room the magnified icons need up front, so the dash never resizes while the pointer moves across the dock. That room is kept out of the dock itself: the work area, the intellihide box and the desktop icons area all match the dock strip you actually see, and the magnified icons rise over the windows the way they do on macOS.
 
+## KDE Plasma / Kirigami port
+
+The native KDE implementation is in [`kde/`](kde/README.md), targeting the latest
+stable Plasma Wayland 6.7.5 with Qt 6.10+ and Kirigami 6.26+. It adds selectable Breeze, Glass,
+Minimal and Classic appearances while porting the dock and stack behavior to KDE.
+See the [build instructions](kde/README.md) and [feature-parity inventory](kde/docs/FEATURE_PARITY.md).
+The port includes native KWin visibility/pressure control and a Dolphin integration
+for full location isolation. See the [validation record](kde/docs/VALIDATION.md) for
+executed native and compositor checks. The instructions below are for the GNOME extension.
+
 ## Installation from source
 
 The extension can be installed directly from source, either for the convenience of using git or to test the latest development version. Clone the desired branch with git

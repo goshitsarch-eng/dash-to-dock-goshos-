@@ -151,3 +151,16 @@ endif
 
 check:
 	ESLINT_USE_FLAT_CONFIG=false $(ESLINT) $(ESLINT_ARGS) .
+
+# Native Plasma 6 / Kirigami port (requires the KDE SDK documented in kde/README.md).
+.PHONY: kde-configure kde-build kde-check
+kde-configure:
+	cmake -S kde -B kde/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+kde-build: kde-configure
+	cmake --build kde/build --parallel 2
+
+kde-check:
+	python3 kde/tests/check-package.py
+	python3 kde/tests/test_migration.py
+	node --test kde/tests/dock-logic.test.cjs
