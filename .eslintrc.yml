@@ -1,5 +1,7 @@
 ignorePatterns:
   - _build/**
+  # KDE uses QML JavaScript directives and its own native/logic checks.
+  - kde/**
 
 extends:
  - ./lint/eslintrc-gjs.yml

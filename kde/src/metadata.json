@@ -1,0 +1,25 @@
+{
+    "KPlugin": {
+        "Name": "Gosho’s Dock",
+        "Description": "A configurable application dock for KDE Plasma",
+        "Version": "0.1.0",
+        "Authors": [
+            {
+                "Name": "Gosho’s Dock contributors"
+            },
+            {
+                "Name": "Eike Hein",
+                "Email": "hein@kde.org"
+            }
+        ],
+        "BugReportUrl": "https://github.com/goshitsarch-eng/dash-to-dock-goshos-/issues",
+        "Category": "Windows and Tasks",
+        "Icon": "preferences-system-windows",
+        "License": "GPL-2.0-or-later",
+        "Website": "https://github.com/goshitsarch-eng/dash-to-dock-goshos-"
+    },
+    "X-Plasma-API-Minimum-Version": "6.7",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.multitasking"
+    ]
+}

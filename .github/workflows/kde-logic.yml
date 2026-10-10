@@ -1,0 +1,15 @@
+name: KDE source and behavior checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  logic:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Validate package, settings and behavior
+        run: make kde-check
+# Native build and desktop acceptance additionally require the matching KDE SDK
+# described in kde/README.md. This job does not claim compositor-level validation.

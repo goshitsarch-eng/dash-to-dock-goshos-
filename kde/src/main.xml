@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
+  <kcfgfile name=""/>
+
+  <group name="General">
+    <entry name="manualHide" type="Bool"><default>false</default></entry>
+    <entry name="dockFixed" type="Bool"><default>false</default></entry>
+    <entry name="autoHide" type="Bool"><default>true</default></entry>
+    <entry name="intelliHide" type="Bool"><default>true</default></entry>
+    <entry name="intelliHideMode" type="Int">
+      <label>Window avoidance: 0 all windows, 1 focused application, 2 maximized windows, 3 always on top.</label>
+      <default>1</default><min>0</min><max>3</max>
+    </entry>
+    <entry name="pressureToShow" type="Bool"><default>true</default></entry>
+    <entry name="pressureThreshold" type="Double"><default>100</default><min>0</min></entry>
+    <entry name="showDelay" type="Double"><label>Delay before revealing the dock, in seconds.</label><default>0.25</default><min>0</min></entry>
+    <entry name="hideDelay" type="Double"><label>Delay before hiding the dock, in seconds.</label><default>0.2</default><min>0</min></entry>
+    <entry name="animationTime" type="Double"><label>Dock movement animation duration, in seconds.</label><default>0.2</default><min>0</min></entry>
+    <entry name="hideInFullscreen" type="Bool"><label>Prevent edge reveal while a fullscreen window occupies the screen.</label><default>true</default></entry>
+    <entry name="preferredOutput" type="String"><default>primary</default></entry>
+    <entry name="allOutputs" type="Bool"><default>false</default></entry>
+    <entry name="dockPosition" type="Int"><label>Screen edge: 0 top, 1 right, 2 bottom, 3 left.</label><default>2</default><min>0</min><max>3</max></entry>
+    <entry name="intendedLengthFraction" type="Double"><default>0.9</default><min>0.1</min><max>1</max></entry>
+    <entry name="extendDock" type="Bool"><default>false</default></entry>
+    <entry name="centerIcons" type="Bool"><default>false</default></entry>
+    <entry name="appsAlwaysAtEdge" type="Bool"><default>true</default></entry>
+    <entry name="iconSizeFixed" type="Bool"><default>false</default></entry>
+    <entry name="scrollToFocused" type="Bool"><default>true</default></entry>
+    <entry name="workspaceAgnosticUrgent" type="Bool"><default>true</default></entry>
+    <entry name="defaultPreviewsOpen" type="Bool"><default>false</default></entry>
+    <entry name="customBackgroundColor" type="Bool"><default>false</default></entry>
+    <entry name="customizeAlphas" type="Bool"><default>false</default></entry>
+    <entry name="isolateLocations" type="Bool"><default>true</default></entry>
+    <entry name="visualStyle" type="Enum">
+      <label>The dock background style.</label>
+      <choices>
+        <choice name="Breeze"/>
+        <choice name="Glass"/>
+        <choice name="Minimal"/>
+        <choice name="Classic"/>
+      </choices>
+      <default>0</default>
+    </entry>
+    <entry name="iconSize" type="Int">
+      <label>The preferred icon size in pixels, subject to available panel space.</label>
+      <default>48</default>
+      <min>16</min>
+      <max>128</max>
+    </entry>
+    <entry name="magnification" type="Bool">
+      <label>Enlarge icons around the pointer.</label>
+      <default>false</default>
+    </entry>
+    <entry name="magnificationFactor" type="Double">
+      <label>The maximum magnification scale.</label>
+      <default>1.5</default>
+      <min>1.0</min>
+      <max>3.0</max>
+    </entry>
+    <entry name="magnificationSpread" type="Double">
+      <label>The number of neighboring icons affected by magnification.</label>
+      <default>2.0</default>
+      <min>1.0</min>
+      <max>6.0</max>
+    </entry>
+    <entry name="launchBounce" type="Bool">
+      <label>Animate application icons while launching.</label>
+      <default>false</default>
+    </entry>
+    <entry name="danceUrgent" type="Bool">
+      <label>Animate application icons when a window needs attention.</label>
+      <default>true</default>
+    </entry>
+    <entry name="dimMinimized" type="Bool">
+      <label>Dim applications whose windows are minimized.</label>
+      <default>false</default>
+    </entry>
+    <entry name="minimizedOpacity" type="Double">
+      <label>The opacity of minimized applications.</label>
+      <default>0.55</default>
+      <min>0.1</min>
+      <max>1.0</max>
+    </entry>
+    <entry name="indicatorStyle" type="Enum">
+      <label>The running application indicator style.</label>
+      <choices>
+        <choice name="Default"/>
+        <choice name="Dots"/>
+        <choice name="Squares"/>
+        <choice name="Dashes"/>
+        <choice name="Segmented"/>
+        <choice name="Solid"/>
+        <choice name="Ciliora"/>
+        <choice name="Metro"/>
+        <choice name="Binary"/>
+        <choice name="Dot"/>
+      </choices>
+      <default>0</default>
+    </entry>
+    <entry name="customColor" type="String">
+      <label>The custom background color.</label>
+      <default>#ffffff</default>
+    </entry>
+    <entry name="customizeIndicators" type="Bool">
+      <label>Use custom running indicator colors and outlines.</label>
+      <default>false</default>
+    </entry>
+    <entry name="indicatorColor" type="Color">
+      <label>The custom running indicator color.</label>
+      <default>#ffffff</default>
+    </entry>
+    <entry name="indicatorBorderColor" type="Color">
+      <label>The custom running indicator outline color.</label>
+      <default>#ffffff</default>
+    </entry>
+    <entry name="indicatorBorderWidth" type="Double">
+      <label>The running indicator outline width.</label>
+      <default>0.0</default>
+      <min>0.0</min>
+      <max>4.0</max>
+    </entry>
+    <entry name="dominantIndicatorColor" type="Bool">
+      <label>Use each application's dominant icon color for its indicator.</label>
+      <default>false</default>
+    </entry>
+    <entry name="unityBacklit" type="Bool">
+      <label>Illuminate the background of running application icons.</label>
+      <default>false</default>
+    </entry>
+    <entry name="glossyIcons" type="Bool">
+      <label>Add a glossy highlight to application icon backgrounds.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showEmblems" type="Bool">
+      <label>Show application icon emblems and progress.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showNotificationCounter" type="Bool">
+      <label>Show notification counts on application icons.</label>
+      <default>true</default>
+    </entry>
+    <entry name="applicationCounterOverridesNotifications" type="Bool">
+      <label>Prefer an application's own count to its notification count.</label>
+      <default>true</default>
+    </entry>
+    <entry name="transparencyMode" type="Int">
+      <label>Background transparency: 0 fixed, 1 adaptive, 2 theme.</label>
+      <default>2</default>
+      <min>0</min>
+      <max>2</max>
+    </entry>
+    <entry name="minAlpha" type="Double">
+      <label>The minimum background opacity in adaptive mode.</label>
+      <default>0.2</default>
+      <min>0.0</min>
+      <max>1.0</max>
+    </entry>
+    <entry name="maxAlpha" type="Double">
+      <label>The maximum background opacity in adaptive mode.</label>
+      <default>0.8</default>
+      <min>0.0</min>
+      <max>1.0</max>
+    </entry>
+    <entry name="backgroundOpacity" type="Double">
+      <label>The background opacity.</label>
+      <default>0.8</default>
+      <min>0.0</min>
+      <max>1.0</max>
+    </entry>
+    <entry name="cornerRadius" type="Int">
+      <label>The background corner radius.</label>
+      <default>16</default>
+      <min>0</min>
+      <max>48</max>
+    </entry>
+    <entry name="compact" type="Bool">
+      <label>Reduce spacing around dock items.</label>
+      <default>false</default>
+    </entry>
+    <entry name="showRunning" type="Bool">
+      <label>Show running applications in the dock.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showFavorites" type="Bool">
+      <label>Show pinned applications in the dock.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showApplications" type="Bool">
+      <label>Show the application launcher button.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showAppsAtStart" type="Bool">
+      <label>Place the application launcher before task icons.</label>
+      <default>false</default>
+    </entry>
+    <entry name="showAppsAction" type="Int">
+      <label>Application button action: 0 application launcher, 1 application stack.</label>
+      <default>1</default>
+      <min>0</min>
+      <max>1</max>
+    </entry>
+    <entry name="applicationsStack" type="Bool">
+      <label>Show the Applications stack.</label>
+      <default>false</default>
+    </entry>
+    <entry name="documentsStack" type="Bool">
+      <label>Show the Documents stack.</label>
+      <default>false</default>
+    </entry>
+    <entry name="downloadsStack" type="Bool">
+      <label>Show the Downloads stack.</label>
+      <default>false</default>
+    </entry>
+    <entry name="homeStack" type="Bool">
+      <label>Show the Home stack.</label>
+      <default>false</default>
+    </entry>
+    <entry name="customFolders" type="StringList">
+      <label>Folder URLs shown as stacks.</label>
+      <default></default>
+    </entry>
+    <entry name="stackView" type="Int">
+      <label>Default stack view: 0 automatic, 1 fan, 2 grid, 3 list.</label>
+      <default>0</default>
+      <min>0</min>
+      <max>3</max>
+    </entry>
+    <entry name="stackSort" type="Int">
+      <label>Default stack sort: 0 name, 1 date, 2 kind.</label>
+      <default>0</default>
+      <min>0</min>
+      <max>2</max>
+    </entry>
+    <entry name="stackOverrides" type="String">
+      <label>Per-stack view and sorting preferences, encoded as JSON.</label>
+      <default>{}</default>
+    </entry>
+    <entry name="stackItemLimit" type="Int">
+      <label>The maximum number of items shown in each stack.</label>
+      <default>40</default>
+      <min>1</min>
+      <max>500</max>
+    </entry>
+    <entry name="stacksDivider" type="Bool">
+      <label>Show a divider between applications and stacks.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showRecentApps" type="Bool">
+      <label>Show recently used applications.</label>
+      <default>false</default>
+    </entry>
+    <entry name="recentAppsLimit" type="Int">
+      <label>The maximum number of recent applications.</label>
+      <default>3</default>
+      <min>1</min>
+      <max>10</max>
+    </entry>
+    <entry name="showTrash" type="Bool">
+      <label>Show Trash in the dock.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showDevices" type="Bool">
+      <label>Show removable devices in the dock.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showNetworkDevices" type="Bool">
+      <label>Show network locations in the dock.</label>
+      <default>false</default>
+    </entry>
+    <entry name="devicesOnlyMounted" type="Bool">
+      <label>Only show mounted removable devices.</label>
+      <default>true</default>
+    </entry>
+    <entry name="clickAction" type="String">
+      <label>The action when clicking an application.</label>
+      <default>cycle-windows</default>
+    </entry>
+    <entry name="shiftClickAction" type="String">
+      <label>The action when Shift-clicking an application.</label>
+      <default>minimize</default>
+    </entry>
+    <entry name="middleClickDockAction" type="String">
+      <label>The action when middle-clicking an application in the dock.</label>
+      <default>launch</default>
+    </entry>
+    <entry name="shiftMiddleClickAction" type="String">
+      <label>The action when Shift-middle-clicking an application.</label>
+      <default>launch</default>
+    </entry>
+    <entry name="dockScrollAction" type="Int">
+      <label>Dock scrolling: 0 none, 1 cycle application windows, 2 switch desktops.</label>
+      <default>0</default>
+      <min>0</min>
+      <max>2</max>
+    </entry>
+    <entry name="showOnlyCurrentScreen" type="Bool">
+      <label>Whether to show only window tasks that are on the same screen as the widget.</label>
+      <default>false</default>
+    </entry>
+    <entry name="showOnlyCurrentDesktop" type="Bool">
+      <label>Whether to only show tasks that are on the current virtual desktop.</label>
+      <default>false</default>
+    </entry>
+    <entry name="showOnlyCurrentActivity" type="Bool">
+      <label>Whether to show only tasks that are on the current activity.</label>
+      <default>true</default>
+    </entry>
+    <entry name="showOnlyMinimized" type="Bool">
+      <label>Whether to show only window tasks that are minmized.</label>
+      <default>false</default>
+    </entry>
+    <entry name="unhideOnAttention" type="Bool">
+      <label>Whether to unhide if a window wants attention.</label>
+      <default>true</default>
+    </entry>
+    <entry name="groupingStrategy" type="Enum">
+      <label>How tasks are grouped: 0 = Do Not Group, 1 = By Program Name</label>
+      <default>1</default>
+    </entry>
+    <entry name="groupedTaskVisualization" type="Enum">
+      <label>What happens when clicking on a grouped task: 0 = cycle through grouped tasks, 1 = try to show tooltips, 2 = try to show present Windows effect, 3 = show textual list (AKA group dialog)</label>
+      <default>0</default>
+    </entry>
+    <entry name="groupPopups" type="Bool">
+      <label>Whether groups are to be reduced to a single task button and expand into a popup or task buttons are grouped on the widget itself.</label>
+      <default>true</default>
+    </entry>
+    <entry name="onlyGroupWhenFull" type="Bool">
+      <label>Whether to group always or only when the widget runs out of space to show additional task buttons comfortably.</label>
+      <default>true</default>
+    </entry>
+    <entry name="groupingAppIdBlacklist" type="StringList">
+      <label>The id's (usually .desktop file names) of applications that should not have their tasks grouped.</label>
+      <default></default>
+    </entry>
+    <entry name="groupingLauncherUrlBlacklist" type="StringList">
+      <label>The launcher URLs (usually .desktop file or executable URLs) of applications that should not have their tasks grouped.</label>
+      <default></default>
+    </entry>
+    <entry name="sortingStrategy" type="Int">
+      <label>Values from TaskManager::TasksModel::SortMode</label>
+      <default>1</default>
+    </entry>
+    <entry name="separateLaunchers" type="Bool">
+      <label>Whether launcher tasks are sorted separately at the left side of the widget or can be mixed with other tasks.</label>
+      <default>true</default>
+    </entry>
+    <entry name="hideLauncherOnStart" type="Bool">
+      <label>Whether launcher tasks should be hidden when their application is launched.</label>
+      <default>true</default>
+    </entry>
+    <entry name="maxStripes" type="Int">
+      <label>The maximum number of rows (in a horizontal-orientation containment, i.e. panel) or columns (in a vertical-orientation containment) to layout task buttons in.</label>
+      <default>1</default>
+      <min>1</min>
+    </entry>
+    <entry name="forceStripes" type="Bool">
+      <label>Whether to try and always layout task buttons in as many rows/columns as set via maxStripes.</label>
+      <default>false</default>
+    </entry>
+    <entry name="showToolTips" type="Bool">
+      <label>Whether to show tooltips when hovering task buttons.</label>
+      <default>true</default>
+    </entry>
+    <entry name="taskMaxWidth" type="Enum">
+      <label>Tune the max width of task items.</label>
+      <choices>
+        <choice name="Narrow"/>
+        <choice name="Medium"/>
+        <choice name="Wide"/>
+      </choices>
+      <default>1</default>
+    </entry>
+    <entry name="wheelEnabled" type="Enum">
+      <label>Whether using the mouse wheel with the mouse pointer above the widget should switch between tasks.</label>
+      <choices>
+        <choice name="None"/>
+        <choice name="AllTask"/>
+        <choice name="TaskOnly"/>
+        <choice name="AdjustVolume"/>
+      </choices>
+      <default>0</default>
+    </entry>
+    <entry name="wheelSkipMinimized" type="Bool">
+      <label>Whether to skip minimized tasks when switching between them using the mouse wheel.</label>
+      <default>true</default>
+    </entry>
+    <entry name="highlightWindows" type="Bool">
+      <label>Whether to request the window manager highlight windows when hovering corresponding task tooltips.</label>
+      <default>false</default>
+    </entry>
+    <entry name="launchers" type="StringList">
+      <label>The list of launcher tasks on the widget. Usually .desktop file or executable URLs. Special URLs such as preferred://browser that expand to default applications are supported.</label>
+      <default>applications:systemsettings.desktop,applications:org.kde.discover.desktop,preferred://filemanager,preferred://browser</default>
+    </entry>
+    <entry name="middleClickAction" type="Enum">
+      <label>What to do on middle-mouse click on a task button.</label>
+      <choices>
+            <choice name="None"/>
+            <choice name="Close"/>
+            <choice name="NewInstance"/>
+            <choice name="ToggleMinimized"/>
+            <choice name="ToggleGrouping"/>
+            <choice name="BringToCurrentDesktop"/>
+      </choices>
+      <default>2</default>
+    </entry>
+    <entry name="indicateAudioStreams" type="Bool">
+      <label>Whether to indicate applications that are playing audio.</label>
+      <default>true</default>
+    </entry>
+    <entry name="interactiveMute" type="Bool">
+      <label>Whether to mute applications that are playing audio using audio indicators.</label>
+      <default>true</default>
+    </entry>
+    <entry name="tooltipControls" type="Bool">
+      <label>Whether to show media and volume controls in the tooltip.</label>
+      <default>true</default>
+    </entry>
+    <entry name="fill" type="Bool">
+      <label>Whether task manager should occupy all available space.</label>
+      <default>true</default>
+    </entry>
+    <entry name="taskHoverEffect" type="Bool">
+      <label>Whether task buttons should change in appearance when the mouse pointer is above them.</label>
+      <default>true</default>
+    </entry>
+    <entry name="maxTextLines" type="Int">
+      <label>The maximum number of text lines to show in a task button. 0 means no limit.</label>
+      <default>0</default>
+    </entry>
+    <entry name="minimizeActiveTaskOnClick" type="Bool">
+      <label>Whether to minimize the currently-active task when clicked. If false, clicking on the currently-active task will do nothing.</label>
+      <default>true</default>
+    </entry>
+    <entry name="reverseMode" type="Bool">
+      <label>Whether to grow the tasks in according to system configuration or opposite to system configuration.</label>
+      <default>false</default>
+    </entry>
+    <entry name="iconSpacing" type="Int">
+      <label> Spacing between icons in task manager. Margin is multiplied by this value.</label>
+      <default>1</default>
+    </entry>
+    <entry name="hotKeys" type="Bool"><default>true</default></entry>
+    <entry name="hotkeysOverlay" type="Bool"><default>true</default></entry>
+    <entry name="hotkeysShowDock" type="Bool"><default>true</default></entry>
+    <entry name="shortcutTimeout" type="Double"><default>2</default><min>0.1</min><max>10</max></entry>
+    <entry name="hideTooltip" type="Bool"><default>false</default></entry>
+    <entry name="previewSizeScale" type="Double"><default>0</default><min>0</min><max>1</max></entry>
+  </group>
+
+</kcfg>
